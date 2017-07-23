@@ -166,7 +166,8 @@ class Indicators(basepoller.BasePollerFT):
 
         interval_size = None
         if self.last_successful_run is not None:
-            interval_size = int(ceil((now - self.last_successful_run)/1000.0))
+            interval_size = int(ceil((now - self.last_successful_run)/(3600*1000.0)))
+        LOG.debug('{} {} => {}'.format(now, self.last_successful_run, interval_size))
 
         indicators = self._retrieve_latest_indicators(
             access_token=access_token,
