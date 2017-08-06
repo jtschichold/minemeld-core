@@ -16,7 +16,6 @@ from __future__ import absolute_import
 
 import logging
 import os
-from math import ceil
 
 import requests
 import yaml
@@ -32,23 +31,31 @@ _TRUSTAR_BASE = 'https://api.trustar.co'
 _TRUSTAR_API_BASE = _TRUSTAR_BASE+'/api/1.2'
 
 
-class Indicators(basepoller.BasePollerFT):
+class Reports(basepoller.BasePollerFT):
     def __init__(self, name, chassis, config):
         self.api_key = None
         self.api_secret = None
 
-        super(Indicators, self).__init__(name, chassis, config)
+        super(Reports, self).__init__(name, chassis, config)
 
     def configure(self):
-        super(Indicators, self).configure()
+        super(Reports, self).configure()
 
         self.verify_cert = self.config.get('verify_cert', True)
 
-        self.indicators_source = self.config.get('indicators_source', None)
-        if self.indicators_source is not None:
-            self.indicators_source = self.indicators_source.upper()
-            if self.indicators_source not in ['OSINT', 'INCIDENT_REPORT']:
-                raise RuntimeError('{} - invalid value for indicators_source'.format(self.name))
+        self.distribution_type = self.config.get('distribution_type', None)
+        if self.distribution_type is not None:
+            self.distribution_type = self.distribution_type.upper()
+            if self.distribution_type not in ['COMMUNITY', 'ENCLAVE']:
+                raise RuntimeError('{} - invalid value for distribution_type'.format(self.name))
+
+        self.enclave_ids = self.config.get('enclave_ids', [])
+
+        self.submitted_by = self.config.get('submitted_by', None)
+        if self.submitted_by is not None:
+            self.submitted_by = self.submitted_by.upper()
+            if self.submitted_by not in ['ME', 'OTHERS']:
+                raise RuntimeError('{} - invalid value for submitted_by'.format(self.name))
 
         self.side_config_path = self.config.get('side_config', None)
         if self.side_config_path is None:
@@ -77,8 +84,8 @@ class Indicators(basepoller.BasePollerFT):
             LOG.info('{} - API secret set'.format(self.name))
 
     def _process_item(self, item):
-        indicator = item[0]
-        type_ = item[1].lower()
+        indicator = item[0]['value']
+        type_ = item[0]['indicatorType'].lower()
 
         if type_ == 'ip':
             try:
@@ -95,7 +102,13 @@ class Indicators(basepoller.BasePollerFT):
         elif type_ == 'url':
             type_ = 'URL'
 
-        return [[indicator, dict(type=type_)]]
+        value = {
+            'type': type_
+        }
+        if item[1] is not None:
+            value['trustar_report_id'] = item[1]
+
+        return [[indicator, value]]
 
     def _retrieve_access_token(self):
         url = (_TRUSTAR_BASE+'/oauth/token')
@@ -120,15 +133,21 @@ class Indicators(basepoller.BasePollerFT):
 
         return r
 
-    def _retrieve_latest_indicators(self, access_token, interval_size):
-        if interval_size is None:
-            interval_size = 24
+    def _retrieve_latest_indicators(self, access_token, from_ts, to_ts):
+        params = {
+            'from': '{}'.format(int(from_ts/1000)),
+            'to': '{}'.format(int(to_ts/1000))
+        }
 
-        params = dict(intervalSize='{}'.format(interval_size))
-        if self.indicators_source:
-            params['source'] = self.indicators_source
+        if self.distribution_type is not None:
+            params['distributionType'] = self.distribution_type
+            if self.distribution_type == 'ENENCLAVE' and self.enclave_ids:
+                params['enclaveIds'] = self.enclave_ids
 
-        url = (_TRUSTAR_API_BASE+'/indicators/latest')
+        if self.submitted_by is not None:
+            params['submittedBy'] = self.submitted_by
+
+        url = (_TRUSTAR_API_BASE+'/reports/')
 
         rkwargs = dict(
             verify=self.verify_cert,
@@ -146,13 +165,24 @@ class Indicators(basepoller.BasePollerFT):
 
         r = json.loads(r.text)
 
-        return r.get('indicators', {})
+        data = r.get('data', None)
+        if data is None:
+            LOG.info('{} - no data in response'.format(self.name))
+            return
 
-    def _ioc_generator(self, indicators):
-        for it in ['IP', 'URL', 'MD5', 'SHA1', 'SHA256']:
-            iocs = indicators.get(it, [])
-            for ioc in iocs:
-                yield (ioc, it)
+        reports = data.get('reports', None)
+        if reports is None:
+            LOG.info('{} - no reports in response'.format(self.name))
+            return
+
+        for report in reports:
+            indicators = report.get('indicators', [])
+            LOG.info('{} - indicators: {!r}'.format(self.name, indicators))
+            for indicator in indicators:
+                if indicator['indicatorType'] not in ['IP', 'URL', 'MD5', 'SHA1', 'SHA256']:
+                    continue
+
+                yield (indicator, report.get('id', None))
 
     def _build_iterator(self, now):
         if not self.api_key:
@@ -164,23 +194,20 @@ class Indicators(basepoller.BasePollerFT):
         access_token = self._retrieve_access_token()
         LOG.info('{} - Retrieved access token'.format(self.name))
 
-        interval_size = None
-        if self.last_successful_run is not None:
-            interval_size = int(ceil((now - self.last_successful_run)/(3600*1000.0)))
-            interval_size = min(interval_size, 24)
-        LOG.debug('{} {} => {}'.format(now, self.last_successful_run, interval_size))
+        from_ts = self.last_successful_run
+        if from_ts is None:
+            from_ts = now - (24 * 86400 * 1000)
 
-        indicators = self._retrieve_latest_indicators(
+        return self._retrieve_latest_indicators(
             access_token=access_token,
-            interval_size=interval_size
+            from_ts=from_ts,
+            to_ts=now
         )
-
-        return self._ioc_generator(indicators)
 
     def hup(self, source=None):
         LOG.info('%s - hup received, reload side config', self.name)
         self._load_side_config()
-        super(Indicators, self).hup(source=source)
+        super(Reports, self).hup(source=source)
 
     @staticmethod
     def gc(name, config=None):

@@ -113,7 +113,7 @@
     "minemeld.ft.localdb.Miner": {
         "class": "minemeld.ft.localdb:Miner"
     },
-    "minemeld.ft.trustar.Indicators": {
-        "class": "minemeld.ft.trustar:Indicators"
+    "minemeld.ft.trustar.Reports": {
+        "class": "minemeld.ft.trustar:Reports"
     }
 }
