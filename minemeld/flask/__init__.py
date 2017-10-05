@@ -84,6 +84,7 @@ def create_app():
     from . import logsapi  # noqa
     from . import extensionsapi  # noqa
     from . import jobsapi  # noqa
+    from . import schemaapi  # noqa
 
     configapi.init_app(app, REDIS_URL)
     extensionsapi.init_app(app)
@@ -105,6 +106,7 @@ def create_app():
     app.register_blueprint(logsapi.BLUEPRINT)
     app.register_blueprint(extensionsapi.BLUEPRINT)
     app.register_blueprint(jobsapi.BLUEPRINT)
+    app.register_blueprint(schemaapi.BLUEPRINT)
 
     # install blueprints from extensions
     for apiname, apimmep in minemeld.loader.map(minemeld.loader.MM_API_ENTRYPOINT).iteritems():
