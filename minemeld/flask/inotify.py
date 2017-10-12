@@ -256,7 +256,7 @@ class MonitoredPaths(object):
 
 
 def _monitor(paths):
-    mask = flags.DELETE | flags.CLOSE_WRITE
+    mask = flags.DELETE | flags.CLOSE_WRITE | flags.MOVED_TO | flags.MOVED_FROM
 
     with INotify() as inotify:
         watchers = {}
@@ -278,6 +278,7 @@ def _monitor(paths):
                         continue
 
                     if listener[3] is not None:
+                        LOG.debug('{!r} {!r}'.format(listener[3], event[3]))
                         if listener[3].match(event[3]) is None:
                             continue
 

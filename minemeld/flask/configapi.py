@@ -54,6 +54,7 @@ from flask import request, jsonify
 from .redisclient import SR
 from .aaa import MMBlueprint
 from .logger import LOG
+from .commit import IN_COMMIT, do_commit
 from . import utils
 
 
@@ -145,6 +146,7 @@ def _lock_timeout(resource, timeout=30):
     while t1 < tt:
         result = _lock(resource)
         if result is not None:
+            LOG.info('locked {}'.format(result))
             return result
 
         t1 = time.sleep(0.01)
@@ -282,8 +284,6 @@ def _load_config_from_file(rcpath):
 
 
 def _commit_config(version):
-    ccpath = utils.committed_config_path()
-
     clock = _lock_timeout(REDIS_KEY_CONFIG)
     if clock is None:
         raise ValueError('Unable to lock config')
@@ -333,39 +333,20 @@ def _commit_config(version):
     temp_config = minemeld.run.config.MineMeldConfig.from_dict(copy.deepcopy(newconfig))
     valid = minemeld.run.config.resolve_prototypes(temp_config)
     if not valid:
+        _unlock(REDIS_KEY_CONFIG, clock)
         raise ValueError('Error resolving prototypes')
     messages = minemeld.run.config.validate_config(temp_config)
     if len(messages) != 0:
+        _unlock(REDIS_KEY_CONFIG, clock)
         return messages
-
-    with open(ccpath, 'w') as f:
-        yaml.safe_dump(
-            newconfig,
-            f,
-            encoding='utf-8',
-            default_flow_style=False
-        )
-
-    for node_id, side_config in side_configs.iteritems():
-        with open(utils.side_config_path(node_id), 'w') as f:
-            yaml.safe_dump(
-                side_config,
-                f,
-                encoding='utf-8',
-                default_flow_style=False
-            )
-
-    with open(utils.pipelines_path(), 'w') as f:
-        yaml.safe_dump(
-            pipelines,
-            f,
-            encoding='utf-8',
-            default_flow_style=False
-        )
 
     _unlock(REDIS_KEY_CONFIG, clock)
 
-    return 'OK'
+    return do_commit(
+        new_config=newconfig,
+        new_side_configs=side_configs,
+        new_pipelines=pipelines
+    )
 
 
 def _increment_config_version():
@@ -700,6 +681,9 @@ def reload_running_config():
 
 @BLUEPRINT.route('/commit', methods=['POST'], read_write=True)
 def commit():
+    if IN_COMMIT:
+        return jsonify(error='commit in progress'), 400
+
     try:
         body = request.get_json()
     except Exception as e:
@@ -717,10 +701,10 @@ def commit():
         LOG.exception('exception in commit')
         return jsonify(error={'message': str(e)}), 400
 
-    if result != 'OK':
-        return jsonify(error={'message': result}), 402
+    if not result[0]:
+        return jsonify(error={'message': result[1]}), 402
 
-    return jsonify(result='OK')
+    return jsonify(result=result[1])
 
 
 @BLUEPRINT.route('/info', methods=['GET'], read_write=False)

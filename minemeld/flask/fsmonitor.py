@@ -3,6 +3,7 @@ from time import time
 import ujson as json
 from blinker import signal
 
+from .logger import LOG
 from . import config
 
 
@@ -49,13 +50,18 @@ def init_paths(monitored_paths):
     )
     monitored_paths.add_listener(
         config.get('MINEMELD_CONFIG_PATH'),
-        listener=_running_config_changed,
+        listener=_committed_config_changed,
         match='^pipelines\.yml$'
     )
     monitored_paths.add_listener(
         config.get('MINEMELD_CONFIG_PATH'),
         listener=_committed_config_changed,
         match='^committed-config\.yml$'
+    )
+    monitored_paths.add_listener(
+        config.get('MINEMELD_CONFIG_PATH'),
+        listener=_committed_config_changed,
+        match='^.*_side_config\.yml$'
     )
     for path in config.get('MINEMELD_PROTOTYPE_PATH').split(':'):
         monitored_paths.add_listener(
