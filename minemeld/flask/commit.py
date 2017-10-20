@@ -17,9 +17,11 @@ from .supervisorclient import MMSupervisor
 from .logger import LOG
 
 
-IN_COMMIT = False
+_IN_COMMIT = False
 _RESTART_GLET = None
 
+def in_commit():
+    return _IN_COMMIT
 
 def _send_status_signal(source, status):
     s = signal('mm-status')
@@ -40,6 +42,14 @@ def _signal_commit_status(status=False):
         source='<commit>',
         status=status
     )
+
+
+def _end_commit(glet=None):
+    global _IN_COMMIT, _RESTART_GLET
+
+    _IN_COMMIT = False
+    _signal_commit_status(False)
+    _RESTART_GLET = None
 
 
 class ContextManagerStack(object):
@@ -244,6 +254,8 @@ def move_file(src, dest):
 
 
 def real_commit(new_config, new_side_configs, new_pipelines):
+    global _RESTART_GLET
+
     ccpath = utils.committed_config_path()
 
     current_config, current_side_configs, current_pipelines = _load_current()
@@ -317,7 +329,7 @@ def real_commit(new_config, new_side_configs, new_pipelines):
 
         if config_changed:
             _RESTART_GLET = gevent.spawn(_restart_engine)
-            _RESTART_GLET.link(lambda x: _signal_commit_status(False))
+            _RESTART_GLET.link(_end_commit)
 
         elif side_configs_changed:
             status = MMMaster.status()
@@ -349,12 +361,11 @@ def real_commit(new_config, new_side_configs, new_pipelines):
 
 
 def do_commit(new_config, new_side_configs, new_pipelines):
-    global IN_COMMIT
-    global _RESTART_GLET
+    global _IN_COMMIT, _RESTART_GLET
 
-    if IN_COMMIT:
+    if _IN_COMMIT:
         return (False, 'commit in progress')
-    IN_COMMIT = True
+    _IN_COMMIT = True
     _RESTART_GLET = None
 
     _signal_commit_status(True)
@@ -368,7 +379,6 @@ def do_commit(new_config, new_side_configs, new_pipelines):
 
     finally:
         if _RESTART_GLET is None:
-            IN_COMMIT = False
-            _signal_commit_status(False)
+            _end_commit()
 
     return result

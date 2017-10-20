@@ -291,7 +291,15 @@ def get_aggregate():
 
     result = None
     for m in body['metrics']:
-        v = _fetch_metric(cc, m, cf=cf, dt=dt, r=resolution, type_=type_)
+        node, metric = m.split('.', 1)
+        node = hashlib.md5(node).hexdigest()[:10]
+        m = node+'.'+metric
+
+        try:
+            v = _fetch_metric(cc, m, cf=cf, dt=dt, r=resolution, type_=type_)
+
+        except OSError, IOError:
+            continue
 
         if result is None:
             result = v

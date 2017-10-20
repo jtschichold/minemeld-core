@@ -54,7 +54,7 @@ from flask import request, jsonify
 from .redisclient import SR
 from .aaa import MMBlueprint
 from .logger import LOG
-from .commit import IN_COMMIT, do_commit
+from .commit import in_commit, do_commit
 from . import utils
 
 
@@ -681,7 +681,7 @@ def reload_running_config():
 
 @BLUEPRINT.route('/commit', methods=['POST'], read_write=True)
 def commit():
-    if IN_COMMIT:
+    if in_commit():
         return jsonify(error='commit in progress'), 400
 
     try:

@@ -26,6 +26,7 @@ import yaml
 from flask import Response, stream_with_context, jsonify, request, send_file
 
 from . import config
+from .commit import in_commit
 from .mmrpc import MMMaster
 from .mmrpc import MMStateFanout
 from .mmrpc import MMRpcClient
@@ -140,6 +141,7 @@ def get_system_info():
     res = {}
     res['sns'] = SNS_AVAILABLE
     res['version'] = __version__
+    res['in_commit'] = in_commit()
 
     return jsonify(result=res)
 

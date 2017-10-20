@@ -71,7 +71,7 @@ class RedisPubChannel(object):
         subscribersc = [int(sc) for sc in subscribersc]
 
         # check the lagger
-        minsubc = 0
+        minsubc = self.num_publish
         if len(subscribersc) != 0:
             minsubc = min(subscribersc)
 

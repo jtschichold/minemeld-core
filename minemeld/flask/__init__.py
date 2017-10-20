@@ -62,7 +62,7 @@ def create_app():
     mmrpc.init_app(app)
     redisclient.init_app(app, REDIS_URL)
     supervisorclient.init_app(app)
-    jobs.init_app(app)
+    jobs.init_app(app, REDIS_URL)
     sns.init_app()
     events.init_app(app, REDIS_URL)
 
