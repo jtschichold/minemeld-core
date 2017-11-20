@@ -191,6 +191,7 @@ class BaseFT(object):
     """
     def __init__(self, name, chassis, config):
         self.name = name
+        self.logger = logging.getLogger('minemeld.engine.node.{}'.format(name))
 
         self.chassis = chassis
 
@@ -213,8 +214,7 @@ class BaseFT(object):
         self._throttled_publish_status = utils.GThrottled(self._internal_publish_status, 3000)
         self._clock = 0
 
-        self._disable_full_trace = 'MM_DISABLE_FULL_TRACE' in os.environ
-        self._disable_full_trace_glet = None
+        self._enable_debug_glet = None
 
     @property
     def state(self):
@@ -222,7 +222,7 @@ class BaseFT(object):
 
     @state.setter
     def state(self, value):
-        LOG.info("%s - transitioning to state %d", self.name, value)
+        self.logger.info("%s - transitioning to state %d", self.name, value)
         self._state = value
 
         if value >= ft_states.INIT and value <= ft_states.STOPPED:
@@ -274,19 +274,19 @@ class BaseFT(object):
 
                     saved_state = None
 
-                LOG.debug('%s - restored checkpoint: %s', self.name, self.last_checkpoint)
+                self.logger.debug('%s - restored checkpoint: %s', self.name, self.last_checkpoint)
 
             # old_status is missing in old releases
             # stick to the old behavior
             if saved_config and saved_config != config:
-                LOG.info(
+                self.logger.info(
                     '%s - saved config does not match new config',
                     self.name
                 )
                 self.last_checkpoint = None
                 return
 
-            LOG.info(
+            self.logger.info(
                 '%s - saved config matches new config',
                 self.name
             )
@@ -295,7 +295,7 @@ class BaseFT(object):
                 self._saved_state_restore(saved_state)
 
         except (ValueError, IOError):
-            LOG.exception('%s - Error reading last checkpoint', self.name)
+            self.logger.exception('%s - Error reading last checkpoint', self.name)
             self.last_checkpoint = None
 
     def create_checkpoint(self, value):
@@ -347,11 +347,11 @@ class BaseFT(object):
 
     def connect(self, inputs, output):
         if self.state != ft_states.READY:
-            LOG.error('connect called in non ready FT')
+            self.logger.error('connect called in non ready FT')
             raise AssertionError('connect called in non ready FT')
 
         for i in inputs:
-            LOG.info("%s - requesting fabric sub channel for %s", self.name, i)
+            self.logger.info("%s - requesting fabric sub channel for %s", self.name, i)
             self.chassis.request_sub_channel(
                 self.name,
                 self,
@@ -450,18 +450,19 @@ class BaseFT(object):
 
     @_counting('update.rx')
     def update(self, source=None, indicator=None, value=None):
-        LOG.debug('%s {%s} - update from %s value %s',
-                  self.name, self.state, source, value)
+        self.logger.debug(
+            '%s {%s} - update from %s value %s',
+            self.name, self.state, source, value
+        )
 
-        if not self._disable_full_trace:
-            self.trace('RECVD_UPDATE', indicator, source_node=source, value=value)
+        self.trace('RECVD_UPDATE', indicator, source_node=source, value=value)
 
         if self.state not in [ft_states.STARTED, ft_states.CHECKPOINT]:
             self.statistics['error.wrong_state'] += 1
             return
 
         if source in self.inputs_checkpoint:
-            LOG.error("update received from checkpointed source")
+            self.logger.error("update received from checkpointed source")
             raise AssertionError("update received from checkpointed source")
 
         if value is not None:
@@ -477,8 +478,7 @@ class BaseFT(object):
         )
 
         if fltindicator is None:
-            if not self._disable_full_trace:
-                self.trace('DROP_UPDATE', indicator, source_node=source, value=value)
+            self.trace('DROP_UPDATE', indicator, source_node=source, value=value)
 
             self.filtered_withdraw(
                 source=source,
@@ -500,18 +500,19 @@ class BaseFT(object):
 
     @_counting('withdraw.rx')
     def withdraw(self, source=None, indicator=None, value=None):
-        LOG.debug('%s {%s} - withdraw from %s value %s',
-                  self.name, self.state, source, value)
+        self.logger.debug(
+            '%s {%s} - withdraw from %s value %s',
+            self.name, self.state, source, value
+        )
 
-        if not self._disable_full_trace:
-            self.trace('RECVD_WITHDRAW', indicator, source_node=source, value=value)
+        self.trace('RECVD_WITHDRAW', indicator, source_node=source, value=value)
 
         if self.state not in [ft_states.STARTED, ft_states.CHECKPOINT]:
             self.statistics['error.wrong_state'] += 1
             return
 
         if source in self.inputs_checkpoint:
-            LOG.error("withdraw received from checkpointed source")
+            self.logger.error("withdraw received from checkpointed source")
             raise AssertionError("withdraw received from checkpointed source")
 
         fltindicator, fltvalue = self.apply_infilters(
@@ -544,19 +545,22 @@ class BaseFT(object):
 
     @_counting('checkpoint.rx')
     def checkpoint(self, source=None, value=None):
-        LOG.debug('%s {%s} - checkpoint from %s value %s',
-                  self.name, self.state, source, value)
+        self.logger.debug(
+            '%s {%s} - checkpoint from %s value %s',
+            self.name, self.state, source, value
+        )
 
         if self.state not in [ft_states.STARTED, ft_states.CHECKPOINT]:
-            LOG.error("%s {%s} - checkpoint received with state not STARTED "
-                      "or CHECKPOINT",
-                      self.name, self.state)
+            self.logger.error(
+                "%s {%s} - checkpoint received with state not STARTED or CHECKPOINT",
+                self.name, self.state
+            )
             raise AssertionError("checkpoint received with state not STARTED "
                                  "or CHECKPOINT")
 
         for v in self.inputs_checkpoint.values():
             if v != value:
-                LOG.error("different checkpoint value received")
+                self.logger.error("different checkpoint value received")
                 raise AssertionError("different checkpoint value received")
 
         self.inputs_checkpoint[source] = value
@@ -570,27 +574,26 @@ class BaseFT(object):
         self.last_checkpoint = value
         self.emit_checkpoint(value)
 
-    def _full_trace_timeout(self, timeout):
+    def _enable_debug_timeout(self, timeout):
         """To be used as greenlet for disabling full trace after a specific time
         """
         gevent.sleep(timeout)
-        self._disable_full_trace = True
-        LOG.debug('{} - full trace disabled'.format(self.name))
+        self.logger.setLevel(logging.NOTSET)
+        self.logger.info('{} - debug disabled'.format(self.name))
 
-    def enable_full_trace(self, timeout=600):
+    def enable_debug(self, timeout=600):
         """Enables full trace
         """
 
-        # if full trace is already enabled, do nothing
-        if self._disable_full_trace is False:
+        if self.logger.getEffectiveLevel() <= logging.DEBUG:
             return
 
-        self._disable_full_trace_glet = gevent.spawn(
-            self._full_trace_timeout,
+        self._enable_debug_glet = gevent.spawn(
+            self._enable_debug_timeout,
             timeout
         )
-        self._disable_full_trace = False
-        LOG.debug('{} - full trace enabled'.format(self.name))
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.info('{} - debug enabled'.format(self.name))
 
     def publish_status(self, force=False):
         if force:
@@ -649,7 +652,7 @@ class BaseFT(object):
             'length': length,
             'inputs': self.inputs,
             'output': (self.output is not None),
-            'trace': not self._disable_full_trace
+            'loglevel': self.logger.getEffectiveLevel()
         }
         self._clock += 1
         return result
@@ -666,9 +669,9 @@ class BaseFT(object):
         return 'OK'
 
     def mgmtbus_signal(self, source=None, signal=None, **kwargs):
-        if signal == 'trace':
-            self.enable_full_trace()
-            return self._disable_full_trace
+        if signal == 'debug':
+            self.enable_debug()
+            return self.logger.getEffectiveLevel()
 
         elif signal == 'hup':
             return self.hup(source=source)
@@ -694,44 +697,29 @@ class BaseFT(object):
         raise NotImplementedError('%s: hup - not implemented' % self.name)
 
     def trace(self, action, indicator, **kwargs):
-        if self.state not in [ft_states.STARTED, ft_states.CHECKPOINT]:
-            LOG.debug(
-                "%s - trace called in wrong state %s",
-                self.name,
-                self.state
-            )
-            return
-
-        trace = {
-            'indicator': indicator,
-            'op': action,
-        }
-        trace.update(kwargs)
-        self.chassis.log(
-            timestamp=utils.utc_millisec(),
-            nodename=self.name,
-            log_type='TRACE',
-            value=trace
+        self.logger.debug(
+            action,
+            extra=dict(indicator=indicator, log_type='TRACE').update(kwargs)
         )
 
     def start(self):
-        LOG.debug("%s - start called", self.name)
+        self.logger.debug("%s - start called", self.name)
 
         if self.state != ft_states.INIT:
-            LOG.error("start on not INIT FT")
+            self.logger.error("start on not INIT FT")
             raise AssertionError("start on not INIT FT")
 
         self.state = ft_states.STARTED
 
     def stop(self):
-        LOG.debug("%s - stop called", self.name)
+        self.logger.debug("%s - stop called", self.name)
 
-        if self._disable_full_trace_glet is not None:
-            self._disable_full_trace_glet.kill()
-            self._disable_full_trace_glet = None
+        if self._enable_debug_glet is not None:
+            self._enable_debug_glet.kill()
+            self._enable_debug_glet = None
 
         if self.state not in [ft_states.IDLE, ft_states.STARTED]:
-            LOG.error("stop on not IDLE or STARTED FT")
+            self.logger.error("stop on not IDLE or STARTED FT")
             raise AssertionError("stop on not IDLE or STARTED FT")
 
         self._throttled_publish_status.cancel()

@@ -92,6 +92,7 @@ setup(
             'mm-console = minemeld.run.console:main',
             'mm-traced = minemeld.traced.main:main',
             'mm-traced-purge = minemeld.traced.purge:main',
+            'mm-logd = minemeld.logd.main:main',
             'mm-supervisord-listener = minemeld.supervisord.listener:main',
             'mm-extensions-freeze = minemeld.run.freeze:main',
             'mm-cacert-merge = minemeld.run.cacert_merge:main',

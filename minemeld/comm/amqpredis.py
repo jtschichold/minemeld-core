@@ -593,14 +593,6 @@ class AMQPRedis(object):
                 ))
                 schannel._callback(m)
 
-            LOG.debug('topic {} - base {} top {} counter {} read {}'.format(
-                schannel.topic,
-                base,
-                top,
-                counter,
-                len(msgs)
-            ))
-
             counter += len(msgs)
 
             if len(msgs) > 0:
@@ -624,7 +616,7 @@ class AMQPRedis(object):
                 gevent.sleep(0)
 
     def _ioloop_failure(self, g):
-        LOG.debug('_ioloop_failure')
+        LOG.error('_ioloop_failure')
 
         try:
             g.get()

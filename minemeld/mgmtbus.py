@@ -55,7 +55,6 @@ MGMTBUS_PREFIX = "mbus:"
 MGMTBUS_TOPIC = MGMTBUS_PREFIX+'bus'
 MGMTBUS_CHASSIS_TOPIC = MGMTBUS_PREFIX+'chassisbus'
 MGMTBUS_MASTER = MGMTBUS_PREFIX+'master'
-MGMTBUS_LOG_TOPIC = MGMTBUS_PREFIX+'log'
 MGMTBUS_STATUS_TOPIC = MGMTBUS_PREFIX+'status'
 
 
@@ -481,12 +480,6 @@ class MgmtbusSlaveHub(object):
         self.comm_class = comm_class
 
         self.comm = minemeld.comm.factory(self.comm_class, self.comm_config)
-
-    def request_log_channel(self):
-        LOG.debug("Adding log channel")
-        return self.comm.request_pub_channel(
-            MGMTBUS_LOG_TOPIC
-        )
 
     def request_status_channel(self):
         LOG.debug("Adding status channel")

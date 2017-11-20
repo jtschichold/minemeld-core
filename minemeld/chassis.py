@@ -31,7 +31,7 @@ import minemeld.mgmtbus
 import minemeld.ft
 import minemeld.fabric
 
-LOG = logging.getLogger(__name__)
+LOG = logging.getLogger('minemeld.engine.chassis')
 STATE_REPORT_INTERVAL = 10
 
 
@@ -44,8 +44,9 @@ class Chassis(object):
             class specific
         mgmtbusconfig (dict): config dictionary for mgmt bus
     """
-    def __init__(self, fabricclass, fabricconfig, mgmtbusconfig):
+    def __init__(self, chassis_num, fabricclass, fabricconfig, mgmtbusconfig):
         self.chassis_id = os.getpid()
+        self.chassis_num = chassis_num
 
         self.fts = {}
         self.poweroff = gevent.event.AsyncResult()
@@ -65,10 +66,6 @@ class Chassis(object):
         )
         self.mgmtbus.add_failure_listener(self.mgmtbus_failed)
         self.mgmtbus.request_chassis_rpc_channel(self)
-
-        self.log_channel_queue = gevent.queue.Queue(maxsize=128)
-        self.log_channel = self.mgmtbus.request_log_channel()
-        self.log_glet = None
 
         self.status_channel_queue = gevent.queue.Queue(maxsize=128)
         self.status_channel = self.mgmtbus.request_status_channel()
@@ -129,26 +126,6 @@ class Chassis(object):
             allowed_methods = []
         self.fabric.request_sub_channel(ftname, ft, subname, allowed_methods)
 
-    def _log_actor(self):
-        while True:
-            try:
-                params = self.log_channel_queue.get()
-                self.log_channel.publish(
-                    method='log',
-                    params=params
-                )
-
-            except Exception:
-                LOG.exception('Error sending log')
-
-    def log(self, timestamp, nodename, log_type, value):
-        self.log_channel_queue.put({
-            'timestamp': timestamp,
-            'source': nodename,
-            'log_type': log_type,
-            'log': value
-        })
-
     def _status_actor(self):
         while True:
             try:
@@ -189,9 +166,6 @@ class Chassis(object):
     def stop(self):
         LOG.info("chassis stop called")
 
-        if self.log_glet is not None:
-            self.log_glet.kill()
-
         if self.status_glet is not None:
             self.status_glet.kill()
 
@@ -216,7 +190,6 @@ class Chassis(object):
     def start(self):
         LOG.info("chassis start called")
 
-        self.log_glet = gevent.spawn(self._log_actor)
         self.status_glet = gevent.spawn(self._status_actor)
 
         for ftname, ft in self.fts.iteritems():

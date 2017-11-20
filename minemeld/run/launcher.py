@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import print_function
-
 import gevent
 import gevent.monkey
 from minemeld.packages import gevent_openssl  # for patching pyopenssl
@@ -33,23 +31,57 @@ import psutil
 import minemeld.chassis
 import minemeld.mgmtbus
 import minemeld.run.config
+import minemeld.logd
 
 from minemeld import __version__
 
-LOG = logging.getLogger(__name__)
+
+ROOT_LOGGER = logging.getLogger()
+MINEMELD_LOGGER = logging.getLogger('minemeld')
+MASTER_LOGGER = logging.getLogger('minemeld.engine.master')
 
 
-def _run_chassis(fabricconfig, mgmtbusconfig, fts):
+def _setup_logging(verbose):
+    verbose = verbose or 'MINEMELD_DEBUG' in os.environ
+
+    formatter = logging.Formatter(
+        fmt="%(asctime)s (%(process)d)%(module)s.%(name)s"
+            " %(levelname)s: %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S"
+    )
+
+    ROOT_LOGGER.setLevel(logging.INFO if not verbose else logging.DEBUG)
+
+    rerrhandler = logging.StreamHandler()
+    rerrhandler.setFormatter(formatter)
+    rerrhandler.setLevel(logging.INFO if not verbose else logging.DEBUG)
+    ROOT_LOGGER.addHandler(rerrhandler)
+
+    mmloghandler = minemeld.logd.handler_factory()
+    mmloghandler.setLevel(logging.INFO if not verbose else logging.DEBUG)
+    MINEMELD_LOGGER.addHandler(mmloghandler)
+
+
+def _run_chassis(chassis_num, fabricconfig, mgmtbusconfig, fts):
+    # notify fork 
+    minemeld.logd.notify_fork()
+
+    logger = logging.getLogger(
+        'minemeld.engine.chassis.{}'.format(chassis_num)
+    )
+
     try:
         # lower priority to make master and web
         # more "responsive"
         os.nice(5)
 
         c = minemeld.chassis.Chassis(
+            chassis_num,
             fabricconfig['class'],
             fabricconfig['config'],
             mgmtbusconfig
         )
+
         c.configure(fts)
 
         gevent.signal(signal.SIGUSR1, c.stop)
@@ -60,18 +92,18 @@ def _run_chassis(fabricconfig, mgmtbusconfig, fts):
 
             gevent.sleep(1)
 
-        LOG.info('Nodes initialized')
+        logger.info('Nodes initialized')
 
         try:
             c.poweroff.wait()
-            LOG.info('power off')
+            logger.info('power off')
 
         except KeyboardInterrupt:
-            LOG.error("We should not be here !")
+            logger.error("We should not be here !")
             c.stop()
 
     except:
-        LOG.exception('Exception in chassis main procedure')
+        logger.exception('Exception in chassis main procedure')
         raise
 
 
@@ -83,10 +115,10 @@ def _check_disk_space(num_nodes):
     needed_disk = free_disk_per_node*num_nodes*1024
     free_disk = psutil.disk_usage('.').free
 
-    LOG.debug('Disk space - needed: {} available: {}'.format(needed_disk, free_disk))
+    MASTER_LOGGER.debug('Disk space - needed: {} available: {}'.format(needed_disk, free_disk))
 
     if free_disk <= needed_disk:
-        LOG.critical(
+        MASTER_LOGGER.critical(
             ('Not enough space left on the device, available: {} needed: {}'
              ' - please delete traces, logs and old engine versions and restart').format(
              free_disk, needed_disk
@@ -144,7 +176,7 @@ def _setup_environment(config):
         cdir = os.path.dirname(config)
     os.environ['MM_CONFIG_DIR'] = cdir
 
-    if not 'REQUESTS_CA_BUNDLE' in os.environ and 'MM_CA_BUNDLE' in os.environ:
+    if 'REQUESTS_CA_BUNDLE' not in os.environ and 'MM_CA_BUNDLE' in os.environ:
         os.environ['REQUESTS_CA_BUNDLE'] = os.environ['MM_CA_BUNDLE']
 
 
@@ -178,12 +210,12 @@ def main():
                 gevent.sleep(1)
 
     def _sigint_handler():
-        LOG.info('SIGINT received')
+        MASTER_LOGGER.info('SIGINT received')
         _cleanup()
         signal_received.set()
 
     def _sigterm_handler():
-        LOG.info('SIGTERM received')
+        MASTER_LOGGER.info('SIGTERM received')
         _cleanup()
         signal_received.set()
 
@@ -198,47 +230,38 @@ def main():
 
     args = _parse_args()
 
-    # logging
-    loglevel = logging.INFO
-    if args.verbose:
-        loglevel = logging.DEBUG
+    _setup_logging(args.verbose)
 
-    logging.basicConfig(
-        level=loglevel,
-        format="%(asctime)s (%(process)d)%(module)s.%(funcName)s"
-               " %(levelname)s: %(message)s",
-        datefmt="%Y-%m-%dT%H:%M:%S"
-    )
-    LOG.info("Starting mm-run.py version %s", __version__)
-    LOG.info("mm-run.py arguments: %s", args)
+    MASTER_LOGGER.info("Starting mm-run.py version %s", __version__)
+    MASTER_LOGGER.info("mm-run.py arguments: %s", args)
 
     _setup_environment(args.config)
 
     # load and validate config
     config = minemeld.run.config.load_config(args.config)
 
-    LOG.info("mm-run.py config: %s", config)
+    MASTER_LOGGER.info("mm-run.py config: %s", config)
 
     if _check_disk_space(num_nodes=len(config.nodes)) is None:
-        LOG.critical('Not enough disk space available, exit')
+        MASTER_LOGGER.critical('Not enough disk space available, exit')
         return 2
 
     np = args.multiprocessing
     if np == 0:
         np = multiprocessing.cpu_count()
-    LOG.info('multiprocessing: #cores: %d', multiprocessing.cpu_count())
-    LOG.info("multiprocessing: max #chassis: %d", np)
+    MASTER_LOGGER.info('multiprocessing: #cores: %d', multiprocessing.cpu_count())
+    MASTER_LOGGER.info("multiprocessing: max #chassis: %d", np)
 
     npc = args.nodes_per_chassis
     if npc <= 0:
-        LOG.critical('nodes-per-chassis should be a positive integer')
+        MASTER_LOGGER.critical('nodes-per-chassis should be a positive integer')
         return 2
 
     np = min(
         int(math.ceil(len(config.nodes)/npc)),
         np
     )
-    LOG.info("Number of chassis: %d", np)
+    MASTER_LOGGER.info("Number of chassis: %d", np)
 
     ftlists = [{} for j in range(np)]
     j = 0
@@ -251,13 +274,14 @@ def main():
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
 
     processes = []
-    for g in ftlists:
+    for idx, g in enumerate(ftlists):
         if len(g) == 0:
             continue
 
         p = multiprocessing.Process(
             target=_run_chassis,
             args=(
+                idx,
                 config.fabric,
                 config.mgmtbus,
                 g
@@ -291,7 +315,7 @@ def main():
         # here nodes should all be starting
 
     except Exception:
-        LOG.exception('Exception initializing graph')
+        MASTER_LOGGER.exception('Exception initializing graph')
         _cleanup()
         raise
 
@@ -302,14 +326,14 @@ def main():
             with processes_lock:
                 r = [int(t.is_alive()) for t in processes]
                 if sum(r) != len(processes):
-                    LOG.info("One of the chassis has stopped, exit")
+                    MASTER_LOGGER.info("One of the chassis has stopped, exit")
                     break
 
     except KeyboardInterrupt:
-        LOG.info("Ctrl-C received, exiting")
+        MASTER_LOGGER.info("Ctrl-C received, exiting")
 
     except:
-        LOG.exception("Exception in main loop")
+        MASTER_LOGGER.exception("Exception in main loop")
 
     if disk_space_monitor_glet is not None:
         disk_space_monitor_glet.kill()
