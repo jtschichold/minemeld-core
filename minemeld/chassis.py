@@ -58,6 +58,7 @@ class Chassis(object):
             self,
             self.fabric_config
         )
+        LOG.info('Fabric created')
 
         self.mgmtbus = minemeld.mgmtbus.slave_hub_factory(
             mgmtbusconfig['slave'],
@@ -66,10 +67,12 @@ class Chassis(object):
         )
         self.mgmtbus.add_failure_listener(self.mgmtbus_failed)
         self.mgmtbus.request_chassis_rpc_channel(self)
+        LOG.info('Slave Hub created')
 
         self.status_channel_queue = gevent.queue.Queue(maxsize=128)
         self.status_channel = self.mgmtbus.request_status_channel()
         self.status_glet = None
+        LOG.info('Initialization complete')
 
     def _dynamic_load(self, classname):
         modname, classname = classname.rsplit('.', 1)
@@ -108,12 +111,14 @@ class Chassis(object):
         # XXX should be moved to constructor
         self.mgmtbus.start()
         self.fabric.start()
+        LOG.info('Mgmtbus and fabric started')
 
         self.mgmtbus.send_master_rpc(
             'chassis_ready',
             params={'chassis_id': self.chassis_id},
             timeout=10
         )
+        LOG.info('Ready sent')
 
     def request_mgmtbus_channel(self, ft):
         self.mgmtbus.request_channel(ft)

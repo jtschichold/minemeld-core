@@ -81,8 +81,10 @@ def _run_chassis(chassis_num, fabricconfig, mgmtbusconfig, fts):
             fabricconfig['config'],
             mgmtbusconfig
         )
+        logger.info('Created')
 
         c.configure(fts)
+        logger.info('Configured')
 
         gevent.signal(signal.SIGUSR1, c.stop)
 
@@ -91,8 +93,7 @@ def _run_chassis(chassis_num, fabricconfig, mgmtbusconfig, fts):
                 break
 
             gevent.sleep(1)
-
-        logger.info('Nodes initialized')
+        logger.info('Nodes initialized/Poweroff signaled')
 
         try:
             c.poweroff.wait()
@@ -191,6 +192,7 @@ def main():
             mbusmaster.checkpoint_graph()
 
         if processes_lock is None:
+            LOG.info('No process lock, cleanup done')
             return
 
         with processes_lock:
@@ -305,13 +307,18 @@ def main():
             num_chassis=len(processes)
         )
         mbusmaster.start()
+        MASTER_LOGGER.info('Mgmtbus master started')
         mbusmaster.wait_for_chassis(timeout=10)
+        MASTER_LOGGER.info('Chassis ready')
         # here nodes are all CONNECTED, fabric and mgmtbus up, with mgmtbus
         # dispatching and fabric not dispatching
         mbusmaster.start_status_monitor()
+        MASTER_LOGGER.info('Status monitor started')
         mbusmaster.init_graph(config)
+        MASTER_LOGGER.info('Graph initialized')
         # here nodes are all INIT
         mbusmaster.start_chassis()
+        MASTER_LOGGER.info('Chassis started')
         # here nodes should all be starting
 
     except Exception:

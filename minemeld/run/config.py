@@ -30,6 +30,7 @@ import yaml
 import gevent.core
 
 import minemeld.loader
+import minemeld.logd
 
 
 __all__ = ['load_config', 'validate_config', 'resolve_prototypes']
@@ -185,7 +186,7 @@ class MineMeldConfig(_Config):
             )
 
             fabric = {
-                'class': 'AMQPRedis',
+                'class': 'ZMQRedis',
                 'config': {
                     'num_connections': fabric_num_conns,
                     'priority': gevent.core.MINPRI
@@ -200,7 +201,7 @@ class MineMeldConfig(_Config):
 
             mgmtbus = {
                 'transport': {
-                    'class': 'AMQP',
+                    'class': 'ZMQRedis',
                     'config': {
                         'num_connections': mgmtbus_num_conns,
                         'priority': gevent.core.MAXPRI
@@ -293,6 +294,8 @@ def _load_and_validate_config_from_file(path):
 
 
 def _destroy_node(change, installed_nodes=None, installed_nodes_gcs=None):
+    minemeld.logd.notify_fork()
+
     LOG.info('Destroying {!r}'.format(change))
 
     destroyed_name = change.nodename

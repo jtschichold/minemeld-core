@@ -565,7 +565,7 @@ def master_factory(config, comm_class, comm_config, nodes, num_chassis):
     return MgmtbusMaster(
         ftlist=nodes,
         config=config,
-        comm_class='AMQP',
+        comm_class='ZMQRedis',
         comm_config=comm_config,
         num_chassis=num_chassis
     )
@@ -587,6 +587,6 @@ def slave_hub_factory(config, comm_class, comm_config):
 
     return MgmtbusSlaveHub(
         config,
-        'AMQP',
+        'ZMQRedis',
         comm_config
     )
