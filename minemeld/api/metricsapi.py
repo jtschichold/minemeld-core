@@ -61,7 +61,7 @@ def _fetch_metric(cc, metric, type_=None,
 
     cc.flush(identifier='minemeld/%s/%s' % (metric, type_))
 
-    (start, end, step), metrics, data = rrdtool.fetch(
+    (start, _, step), _, data = rrdtool.fetch(
         str(os.path.join(dirname, rrdname)),
         cf,
         '--start', '-%d' % dt,

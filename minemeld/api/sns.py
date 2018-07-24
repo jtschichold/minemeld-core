@@ -37,7 +37,7 @@ class Sns(object):
                     with open(self.filename, 'w') as f:
                         f.write(self.uuid)
                         LOG.debug('New uuid file created.')
-                except Exception as e:
+                except Exception:
                     # Let the caller know uuid was not saved meaning sns might not be ready
                     LOG.exception('Something went wrong creating the uuid file: {}'.format(self.filename))
                     return False
@@ -74,7 +74,7 @@ class Sns(object):
                               data=json.dumps(kvmessage),
                               timeout=5,
                               headers={'Content-Type': 'application/json'})
-        except Exception as e:
+        except Exception:
             LOG.exception('Failure sending the message to the sns cloud provider')
             return False
         if r.status_code == requests.codes.ok:

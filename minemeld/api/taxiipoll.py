@@ -1,3 +1,4 @@
+from __future__ import division
 #  Copyright 2015-2016 Palo Alto Networks, Inc
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,7 +23,7 @@ import libtaxii.constants
 import stix.core
 
 from flask import request, Response, stream_with_context
-from flask.ext.login import current_user
+from flask_login import current_user
 
 from .redisclient import SR
 from .taxiiutils import taxii_check, get_taxii_feeds
@@ -51,7 +52,7 @@ def _oldest_indicator_timestamp(feed):
     if len(olist) == 0:
         return None
 
-    ots = int(olist[0][1])/1000
+    ots = int(olist[0][1])//1000
 
     return datetime.datetime.fromtimestamp(ots, pytz.utc)
 
@@ -77,7 +78,7 @@ def _indicators_feed(feed, excbegtime, incendtime):
 
             if value.startswith('lz4'):
                 try:
-                    value = lz4.decompress(value[3:])
+                    value = lz4.frame.decompress(value[3:])
                     value = stix.core.STIXPackage.from_json(value)
                     value = value.to_xml(
                         ns_dict={'https://go.paloaltonetworks.com/minemeld': 'minemeld'}

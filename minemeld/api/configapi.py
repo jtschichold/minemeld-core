@@ -1,3 +1,4 @@
+# pylint:disable=E1123
 #  Copyright 2015-2016 Palo Alto Networks, Inc
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
@@ -209,7 +210,7 @@ def _load_config_from_file(rcpath):
         )
 
     nodes = rcconfig.get('nodes', {})
-    for idx, (nodename, nodevalue) in enumerate(nodes.iteritems()):
+    for idx, (nodename, nodevalue) in enumerate(nodes.items()):
         _set_stanza(
             'node%d' % idx,
             {'name': nodename, 'properties': nodevalue},

@@ -28,7 +28,7 @@ CONFIG = {}
 API_CONFIG_PATH = None
 API_CONFIG_LOCK = None
 
-CONFIG_FILES_RE = '^(?:(?:[0-9]+.*\.yml)|(?:.*\.htpasswd))$'
+CONFIG_FILES_RE = '^(?:(?:[0-9]+.*\.yml)|(?:.*\.htpasswd))$'  # pylint:disable=W1401
 
 # if you change things here change also backup/import API
 _AUTH_DBS = {
@@ -133,7 +133,7 @@ def _load_config(config_path):
 def _load_auth_dbs(config_path):
     with API_CONFIG_LOCK.acquire():
         api_config_path = os.path.join(config_path, 'api')
-        for env, default in _AUTH_DBS.iteritems():
+        for env, default in _AUTH_DBS.items():
             dbname = get(env, default)
             new_db = False
 
