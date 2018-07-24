@@ -45,11 +45,11 @@ def _send_cmd(ctx, target, command, params=None, source=True):
 
 
 def _print_json(obj):
-    print json.dumps(
+    print(json.dumps(
         obj,
         indent=4,
         sort_keys=True
-    )
+    ))
 
 
 @click.group()
