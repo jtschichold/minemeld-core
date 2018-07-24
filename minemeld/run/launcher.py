@@ -207,15 +207,15 @@ def main():
                " %(levelname)s: %(message)s",
         datefmt="%Y-%m-%dT%H:%M:%S"
     )
-    LOG.info("Starting mm-run.py version %s", __version__)
-    LOG.info("mm-run.py arguments: %s", args)
+    LOG.info("Starting mm-engine version %s", __version__)
+    LOG.info("mm-engine arguments: %s", args)
 
     _setup_environment(args.config)
 
     # load and validate config
     config = minemeld.run.config.load_config(args.config)
 
-    LOG.info("mm-run.py config: %s", config)
+    LOG.info("mm-engine config: %s", config)
 
     if _check_disk_space(num_nodes=len(config.nodes)) is None:
         LOG.critical('Not enough disk space available, exit')

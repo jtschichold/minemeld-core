@@ -332,7 +332,7 @@ class MgmtbusMaster(object):
             length = a.get('length', None)
 
             _, _, source = source.split(':', 2)
-            source = hashlib.md5(source).hexdigest()[:10]
+            source = hashlib.md5(source.encode('utf-8')).hexdigest()[:10]
 
             for m, v in stats.items():
                 gstats[ntype+'.'+m] += v

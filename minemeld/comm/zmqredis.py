@@ -153,7 +153,7 @@ class ZMQRpcFanoutClientChannel(object):
             LOG.debug('RPC Fanout reply recving from {}:reply'.format(self.fanout))
             body = self.reply_socket.recv_json()
             LOG.debug('RPC Fanout reply from {}:reply recvd: {!r}'.format(self.fanout, body))
-            self.reply_socket.send('OK')
+            self.reply_socket.send(b'OK')
             LOG.debug('RPC Fanout reply from {}:reply recvd: {!r} - ok'.format(self.fanout, body))
 
             source = body.get('source', None)
@@ -283,10 +283,10 @@ class ZMQRpcServerChannel(object):
 
         if self.fanout is not None:
             reply_socket = self.context.socket(zmq.REQ)
-            reply_socket.connect('ipc:///var/run/minemeld/{}'.format(reply_to))
+            reply_socket.connect('ipc:///var/run/minemeld/{!s}'.format(reply_to.decode('utf-8')))
             LOG.debug('RPC Server {} result to {}'.format(self.name, reply_to))
             reply_socket.send_json(ans)
-            reply_socket.recv()
+            _ = reply_socket.recv()
             LOG.debug('RPC Server {} result to {} - done'.format(self.name, reply_to))
             reply_socket.close(linger=0)
             LOG.debug('RPC Server {} result to {} - closed'.format(self.name, reply_to))
@@ -306,7 +306,7 @@ class ZMQRpcServerChannel(object):
 
             if self.fanout is not None:
                 reply_to, body = toks
-                reply_to = reply_to+':reply'
+                reply_to = reply_to+b':reply'
             else:
                 reply_to, _, body = toks
 

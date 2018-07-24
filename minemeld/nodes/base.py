@@ -415,7 +415,7 @@ class BaseNode(object):
             return
 
         if value is not None:
-            for k in value.keys():
+            for k in list(value.keys()):
                 if k[0] in ['_', '$']:
                     value.pop(k)
 
@@ -443,7 +443,7 @@ class BaseNode(object):
             return
 
         if value is not None:
-            for k in value.keys():
+            for k in list(value.keys()):
                 if k[0] in ['_', '$']:
                     value.pop(k)
 
@@ -480,7 +480,7 @@ class BaseNode(object):
             raise AssertionError("update received from checkpointed source")
 
         if value is not None:
-            for k in value.keys():
+            for k in list(value.keys()):
                 if k.startswith("_"):
                     value.pop(k)
 
@@ -542,7 +542,7 @@ class BaseNode(object):
             return
 
         if fltvalue is not None:
-            for k in fltvalue.keys():
+            for k in list(fltvalue.keys()):
                 if k.startswith("_"):
                     fltvalue.pop(k)
 

@@ -75,13 +75,13 @@ class MMBlueprint(Blueprint):
             if request and flask_login.current_user:
                 params = []
 
-                for key, values in request.values.iterlists():
+                for key, values in request.values.lists():
                     if key == '_':
                         continue
 
                     params.append(('value:{}'.format(key), values))
 
-                for filename, files in request.files.iterlists():
+                for filename, files in request.files.lists():
                     params.append(('file:{}'.format(filename), [file.filename for file in files]))
 
                 body = request.get_json(silent=True)

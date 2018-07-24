@@ -86,6 +86,7 @@ def service_status():
 
     supervisorstate['processes'] = {}
     pinfo = MMSupervisor.supervisor.getAllProcessInfo()
+    LOG.debug('{}'.format(pinfo))
     for p in pinfo:
         process = {
             'statename': p['statename'],
@@ -93,11 +94,14 @@ def service_status():
             'children': None
         }
 
+        if p.get('pid', 0) == 0:
+            continue
+
         try:
             ps = psutil.Process(pid=p['pid'])
             process['children'] = len(ps.children())
 
-        except:
+        except Exception:
             LOG.exception("Error retrieving childen of %d" % p['pid'])
 
         supervisorstate['processes'][p['name']] = process
@@ -135,7 +139,7 @@ def restart_minemeld_engine():
 
 @BLUEPRINT.route('/supervisor/minemeld-web/hup', methods=['GET'], read_write=True)
 def hup_minemeld_web():
-    info = MMSupervisor.supervisor.getProcessInfo('minemeld-web')
+    info = MMSupervisor.supervisor.getProcessInfo('minemeld-api')
 
     apipid = info['pid']
     os.kill(apipid, SIGHUP)
