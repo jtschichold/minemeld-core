@@ -509,7 +509,7 @@ def get_feed_content(feed):
     if nname not in tr:
         return jsonify(error={'message': 'Unknown feed'}), 404
     nclass = tr[nname].get('class', None)
-    if nclass != 'minemeld.ft.redis.RedisSet':
+    if nclass != 'minemeld.nodes.redis.RedisSet':
         return jsonify(error={'message': 'Unknown feed'}), 404
 
     start = request.values.get('s')

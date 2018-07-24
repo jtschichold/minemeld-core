@@ -44,7 +44,7 @@ import redis
 import ujson
 
 import minemeld.comm
-import minemeld.ft
+import minemeld.nodes
 
 from .collectd import CollectdClient
 from .startupplanner import plan
@@ -263,7 +263,7 @@ class MgmtbusMaster(object):
 
             all_started = True
             for answer in result['answers'].values():
-                if answer.get('state', None) != minemeld.ft.ft_states.STARTED:
+                if answer.get('state', None) != minemeld.nodes.ft_states.STARTED:
                     all_started = False
                     break
             if not all_started:

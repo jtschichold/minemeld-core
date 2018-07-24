@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 """
-This module implements minemeld.ft.base.BaseFT, the base class for nodes.
+This module implements minemeld.nodes.base.BaseNode, the base class for nodes.
 """
 
 from __future__ import absolute_import
@@ -34,7 +34,7 @@ from . import utils
 LOG = logging.getLogger(__name__)
 
 
-class _Filters(object):
+class Filters(object):
     """Implements a set of filters to be applied to indicators.
     Used by mineneld.ft.base.BaseFT for ingress and egress filters.
 
@@ -129,7 +129,7 @@ def _counting(statsname):
     return _counter_out
 
 
-class BaseFT(object):
+class BaseNode(object):
     """Implements base class of MineMeld engine nodes.
 
     **Config parameters**
@@ -292,7 +292,7 @@ class BaseFT(object):
             )
 
             if saved_state is not None:
-                self._saved_state_restore(saved_state)
+                self.saved_state_restore(saved_state)
 
         except (ValueError, IOError):
             LOG.exception('%s - Error reading last checkpoint', self.name)
@@ -314,7 +314,7 @@ class BaseFT(object):
         contents = {
             'checkpoint': value,
             'config': json.dumps(config, sort_keys=True),
-            'state': self._saved_state_create()
+            'state': self.saved_state_create()
         }
 
         with open(self.name+'.chkp', 'w') as f:
@@ -328,10 +328,10 @@ class BaseFT(object):
         except (IOError, OSError):
             pass
 
-    def _saved_state_restore(self, saved_state):
+    def saved_state_restore(self, saved_state):
         pass
 
-    def _saved_state_create(self):
+    def saved_state_create(self):
         return {}
 
     def configure(self):
@@ -342,8 +342,8 @@ class BaseFT(object):
         When this method is changed to add/remove new parameters, the class
         docstring should be updated.
         """
-        self.infilters = _Filters(self.config.get('infilters', []))
-        self.outfilters = _Filters(self.config.get('outfilters', []))
+        self.infilters = Filters(self.config.get('infilters', []))
+        self.outfilters = Filters(self.config.get('outfilters', []))
 
     def connect(self, inputs, output):
         if self.state != ft_states.READY:
@@ -371,9 +371,6 @@ class BaseFT(object):
                 'update',
                 'withdraw',
                 'checkpoint',
-                'get',
-                'get_all',
-                'get_range',
                 'length'
             ]
         )
@@ -691,6 +688,9 @@ class BaseFT(object):
             self.enable_full_trace()
             return self._disable_full_trace
 
+        if signal == 'hup':
+            return self.hup(source=source)
+
         raise NotImplementedError('{}: signal - not implemented'.format(self.name))
 
     def initialize(self):
@@ -704,16 +704,6 @@ class BaseFT(object):
 
     def get_state(self):
         return self.state
-
-    def get(self, source=None, indicator=None):
-        raise NotImplementedError('%s: get - not implemented' % self.name)
-
-    def get_all(self, source=None):
-        raise NotImplementedError('%s: get_all - not implemented' % self.name)
-
-    def get_range(self, source=None, index=None, from_key=None, to_key=None):
-        raise NotImplementedError('%s: get_range - not implemented' %
-                                  self.name)
 
     def length(self, source=None):
         raise NotImplementedError('%s: length - not implemented' % self.name)

@@ -225,8 +225,8 @@ class ZMQRpcFanoutClientChannel(object):
 
         LOG.debug('RPC Fanout Client: send multipart to {}: {!r}'.format(self.fanout, json.dumps(body)))
         self.socket.send_multipart([
-            '{}'.format(self.fanout),
-            json.dumps(body)
+            ('{}'.format(self.fanout)).encode('utf-8'),
+            json.dumps(body).encode('utf-8')
         ])
         LOG.debug('RPC Fanout Client: send multipart to {}: {!r} - done'.format(self.fanout, json.dumps(body)))
 
@@ -293,7 +293,7 @@ class ZMQRpcServerChannel(object):
             reply_socket = None
 
         else:
-            self.socket.send_multipart([reply_to, '', json.dumps(ans)])
+            self.socket.send_multipart([reply_to, b'', json.dumps(ans).encode('utf-8')])
 
     def run(self):
         if self.socket is None:

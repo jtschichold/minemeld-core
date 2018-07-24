@@ -29,7 +29,7 @@ from .redisclient import SR
 from .taxiiutils import taxii_check, get_taxii_feeds
 from .aaa import MMBlueprint
 from .logger import LOG
-from minemeld.ft.utils import dt_to_millisec
+from minemeld.nodes.utils import dt_to_millisec
 
 
 __all__ = ['BLUEPRINT']

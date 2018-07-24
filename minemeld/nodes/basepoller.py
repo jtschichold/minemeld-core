@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 """
-This module implements minemeld.ft.basepoller.BasePollerFT, a base class for
+This module implements minemeld.nodes.basepoller.BasePollerNode, a base class for
 miners retrieving indicators by periodically polling an external source.
 """
 
@@ -198,7 +198,7 @@ class IndicatorStatus(object):
             self.state = self.state | IndicatorStatus.W_MASK
 
 
-class BasePollerFT(base.BaseFT):
+class BasePollerNode(base.BaseNode):
     """Implements base class for polling miners.
 
     **Config parameters**
@@ -318,10 +318,10 @@ class BasePollerFT(base.BaseFT):
 
         self.state_lock = RWLock()
 
-        super(BasePollerFT, self).__init__(name, chassis, config)
+        super().__init__(name, chassis, config)
 
     def configure(self):
-        super(BasePollerFT, self).configure()
+        super().configure()
 
         self.source_name = self.config.get('source_name', self.name)
         self.attributes = self.config.get('attributes', {})
@@ -343,25 +343,25 @@ class BasePollerFT(base.BaseFT):
                 default_base=self._DEFAULT_AGE_OUT_BASE
             )
         }
-        for k, v in _age_out.iteritems():
+        for k, v in _age_out.items():
             if k in self.age_out:
                 continue
             self.age_out[k] = parse_age_out(v)
 
-    def _saved_state_restore(self, saved_state):
+    def saved_state_restore(self, saved_state):
         self.last_run = saved_state.get('last_run', None)
         self.last_successful_run = saved_state.get(
             'last_successful_run',
             None
         )
 
-    def _saved_state_create(self):
+    def saved_state_create(self):
         return {
             'last_run': self.last_run,
             'last_successful_run': self.last_successful_run
         }
 
-    def _saved_state_reset(self):
+    def saved_state_reset(self):
         self.last_successful_run = None
         self.last_run = None
 
@@ -382,17 +382,37 @@ class BasePollerFT(base.BaseFT):
         self._initialize_table(truncate=(self.last_checkpoint is None))
 
     def reset(self):
-        self._saved_state_reset()
+        self.saved_state_reset()
         self._initialize_table(truncate=True)
 
-    @base.BaseFT.state.setter
+    @base.BaseNode.state.setter
     def state(self, value):
         LOG.debug("%s - acquiring state write lock", self.name)
         self.state_lock.lock()
         #  this is weird ! from stackoverflow 10810369
-        super(BasePollerFT, self.__class__).state.fset(self, value)
+        super(BasePollerNode, self.__class__).state.fset(self, value)
         self.state_lock.unlock()
         LOG.debug("%s - releasing state write lock", self.name)
+
+    def process_item(self, item):
+        """Process a single item from the iterator. This method should be implemented
+        in subclasses.
+        
+        Args:
+            item (any): item to be processed
+        """
+
+        raise NotImplementedError()
+
+    def build_iterator(self, now):
+        """Return an iterator over the indicators for this poll. This should be
+        implemented in subclasses
+        
+        Args:
+            now (int): current timestamp
+        """
+
+        raise NotImplementedError()
 
     def _controlled_emit_update(self, indicator, value):
         self._emit_counter += 1
@@ -537,7 +557,7 @@ class BasePollerFT(base.BaseFT):
                     return False
 
                 try:
-                    ipairs = self._process_item(item)
+                    ipairs = self.process_item(item)
 
                 except gevent.GreenletExit:
                     raise
@@ -568,12 +588,12 @@ class BasePollerFT(base.BaseFT):
                 )
                 return False
 
-            iterator = self._build_iterator(now)
+            iterator = self.build_iterator(now)
 
             if iterator is None:
                 return False
 
-        process_item = self._process_item
+        process_item = self.process_item
         aggregation_exc = None
         if self.aggregate_indicators:
             if self.agg_table is not None:
@@ -583,7 +603,7 @@ class BasePollerFT(base.BaseFT):
             try:
                 if not self._aggregate_iterator(iterator):
                     return False
-            except:
+            except Exception:
                 # if aggregate_use_partial is True, we store exception
                 # and handle partial results
                 if not self.aggregate_use_partial:
@@ -608,7 +628,7 @@ class BasePollerFT(base.BaseFT):
                 except gevent.GreenletExit:
                     raise
 
-                except:
+                except Exception:
                     self.statistics['error.parsing'] += 1
                     LOG.exception('%s - Exception parsing %s', self.name, item)
                     continue
@@ -695,7 +715,7 @@ class BasePollerFT(base.BaseFT):
 
         if aggregation_exc is not None:
             LOG.info('{} - Reraising exception happened during aggregation'.format(self.name))
-            raise aggregation_exc[0], aggregation_exc[1], aggregation_exc[2]
+            raise aggregation_exc[1].with_traceback(aggregation_exc[2])
 
         return True
 
@@ -891,7 +911,7 @@ class BasePollerFT(base.BaseFT):
             self.poll_event.clear()
 
     def mgmtbus_status(self):
-        result = super(BasePollerFT, self).mgmtbus_status()
+        result = super().mgmtbus_status()
         result['last_run'] = self.last_run
         result['last_successful_run'] = self.last_successful_run
         result['sub_state'] = self.sub_state[0]
@@ -903,7 +923,7 @@ class BasePollerFT(base.BaseFT):
 
     def mgmtbus_signal(self, source=None, signal=None, **kwargs):
         if signal != 'flush':
-            super(BasePollerFT, self).mgmtbus_signal(
+            super().mgmtbus_signal(
                 source=source,
                 signal=signal,
                 **kwargs
@@ -939,7 +959,7 @@ class BasePollerFT(base.BaseFT):
         return self.table.length()
 
     def start(self):
-        super(BasePollerFT, self).start()
+        super().start()
 
         if self._actor_glet is not None:
             return
@@ -957,7 +977,7 @@ class BasePollerFT(base.BaseFT):
         )
 
     def stop(self):
-        super(BasePollerFT, self).stop()
+        super().stop()
 
         if self._actor_glet is None:
             return
@@ -972,6 +992,6 @@ class BasePollerFT(base.BaseFT):
 
     @staticmethod
     def gc(name, config=None):
-        base.BaseFT.gc(name, config=config)
+        base.BaseNode.gc(name, config=config)
         shutil.rmtree(name, ignore_errors=True)
         shutil.rmtree('{}.aggregate-temp'.format(name), ignore_errors=True)

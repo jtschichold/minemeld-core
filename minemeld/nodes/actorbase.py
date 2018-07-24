@@ -4,7 +4,7 @@ from collections import namedtuple
 import gevent
 from gevent.queue import Queue
 
-from minemeld.ft.base import BaseFT, _counting
+from .base import BaseNode, _counting
 
 
 LOG = logging.getLogger(__name__)
@@ -12,9 +12,9 @@ LOG = logging.getLogger(__name__)
 ActorCommand = namedtuple('ActorCommand', ['command', 'kwargs_'])
 
 
-class ActorBaseFT(BaseFT):
+class ActorBaseNode(BaseNode):
     def __init__(self, *args, **kwargs):
-        super(ActorBaseFT, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self._actor_queue = Queue(maxsize=1)
         self._actor_glet = None
@@ -40,11 +40,11 @@ class ActorBaseFT(BaseFT):
             acommand = self._actor_queue.get()
 
             if acommand.command == 'checkpoint':
-                method = super(ActorBaseFT, self).checkpoint
+                method = super().checkpoint
             elif acommand.command == 'update':
-                method = super(ActorBaseFT, self).update
+                method = super().update
             elif acommand.command == 'withdraw':
-                method = super(ActorBaseFT, self).withdraw
+                method = super().withdraw
             elif acommand.command == 'rebuild':
                 method = self._rebuild
             else:
@@ -57,8 +57,11 @@ class ActorBaseFT(BaseFT):
             except:
                 LOG.exception('{} - error executing {!r}'.format(self.name, acommand))
 
+    def _rebuild(self):
+        raise NotImplementedError()
+
     def start(self):
-        super(ActorBaseFT, self).start()
+        super().start()
 
         if self._actor_glet is not None:
             return
@@ -66,7 +69,7 @@ class ActorBaseFT(BaseFT):
         self._actor_glet = gevent.spawn(self._actor_loop)
 
     def stop(self):
-        super(ActorBaseFT, self).stop()
+        super().stop()
 
         if self._actor_glet is None:
             return

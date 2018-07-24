@@ -73,7 +73,7 @@ over the keys (2,<index id>,0xF0,<encoded value>) and
 """
 
 import os
-import plyvel
+import plyvel  #pylint:disable=E0401
 import struct
 import ujson
 import time
@@ -155,7 +155,7 @@ class Table(object):
                 _, _, indexid = struct.unpack("BBB", k)
                 if v in self.indexes:
                     raise InvalidTableException("2 indexes with the same name")
-                self.indexes[v] = {
+                self.indexes[v.decode('utf-8')] = {
                     'id': indexid,
                     'last_global_id': 0
                 }
@@ -193,20 +193,36 @@ class Table(object):
         self.close()
 
     def get_custom_metadata(self):
+        """Retrieve custom metadata
+        
+        Returns:
+            dict: Metadata, None if no metadata exists
+        """
+
         cmetadata = self._get(CUSTOM_METADATA)
         if cmetadata is None:
             return None
         return ujson.loads(cmetadata)
 
     def set_custom_metadata(self, metadata=None):
+        """Set custom metadata
+
+        Args:
+            metadata (dict, optional): Defaults to None. metadata to set, if
+            None, deletes existing metadata
+        """
+
         if metadata is None:
             self.db.delete(CUSTOM_METADATA)
             return
 
         cmetadata = ujson.dumps(metadata)
-        self.db.put(CUSTOM_METADATA, cmetadata)
+        self.db.put(CUSTOM_METADATA, cmetadata.encode('utf-8'))
 
     def close(self):
+        """Close table
+        """
+
         if self.db is not None:
             self.db.close()
 
@@ -217,14 +233,32 @@ class Table(object):
         self._compact_glet = None
 
     def exists(self, key):
-        if type(key) == unicode:
+        """Check if key exists
+        
+        Args:
+            key (bytes or str): Key to check
+        
+        Returns:
+            bool: True if key exists
+        """
+
+        if isinstance(key, str):
             key = key.encode('utf8')
 
         ikeyv = self._indicator_key_version(key)
         return (self._get(ikeyv) is not None)
 
     def get(self, key):
-        if type(key) == unicode:
+        """Retrive value associated with key
+        
+        Args:
+            key (bytes or str): Key
+        
+        Returns:
+            dict: value or None if key does not exist
+        """
+
+        if isinstance(key, str):
             key = key.encode('utf8')
 
         ikey = self._indicator_key(key)
@@ -236,7 +270,7 @@ class Table(object):
         return ujson.loads(value[8:])
 
     def delete(self, key):
-        if type(key) == unicode:
+        if isinstance(key, str):
             key = key.encode('utf8')
 
         ikey = self._indicator_key(key)
@@ -261,12 +295,12 @@ class Table(object):
     def _index_key(self, idxid, value, lastidxid=None):
         key = struct.pack("BBB", 2, idxid, 0xF0)
 
-        if type(value) == unicode:
-            value = value.encode('utf8')
+        if isinstance(value, str):
+            value = value.encode('utf-8')
 
-        if type(value) == str:
+        if isinstance(value, bytes):
             key += struct.pack(">BL", 0x0, len(value))+value
-        elif type(value) == int or type(value) == long:
+        elif isinstance(value, int):
             key += struct.pack(">BQ", 0x1, value)
         else:
             raise ValueError("Unhandled value type: %s" % type(value))
@@ -280,13 +314,20 @@ class Table(object):
         return struct.pack("BBB", 2, idxid, 0)
 
     def create_index(self, attribute):
+        """Create an index for a specific attribute. Index will be populated
+        new values.
+        
+        Args:
+            attribute (str): Attribute to be indexed
+        """
+
         if attribute in self.indexes:
             return
 
         if len(self.indexes) == 0:
             idxid = 0
         else:
-            idxid = max([i['id'] for i in self.indexes.values()])+1
+            idxid = max([i['id'] for i in list(self.indexes.values())])+1
 
         self.indexes[attribute] = {
             'id': idxid,
@@ -294,14 +335,14 @@ class Table(object):
         }
 
         batch = self.db.write_batch()
-        batch.put(struct.pack("BBB", 0, 1, idxid), attribute)
+        batch.put(struct.pack("BBB", 0, 1, idxid), attribute.encode('utf-8'))
         batch.write()
 
     def put(self, key, value):
-        if type(key) == unicode:
+        if isinstance(key, str):
             key = key.encode('utf8')
 
-        if type(value) != dict:
+        if not isinstance(value, dict):
             raise ValueError()
 
         ikey = self._indicator_key(key)
@@ -312,10 +353,10 @@ class Table(object):
         cversion = self.last_global_id
 
         now = time.time()
-        self.last_update = now
+        self.last_update = int(now*1000)
 
         batch = self.db.write_batch()
-        batch.put(ikey, struct.pack(">Q", cversion)+ujson.dumps(value))
+        batch.put(ikey, struct.pack(">Q", cversion)+ujson.dumps(value).encode('utf-8'))
         batch.put(ikeyv, struct.pack(">Q", cversion))
         batch.put(LAST_UPDATE_KEY, struct.pack(">Q", self.last_update))
         batch.put(TABLE_LAST_GLOBAL_ID, struct.pack(">Q", self.last_global_id))
@@ -327,7 +368,7 @@ class Table(object):
                 struct.pack(">Q", self.num_indicators)
             )
 
-        for iattr, index in self.indexes.iteritems():
+        for iattr, index in self.indexes.items():
             v = value.get(iattr, None)
             if v is None:
                 continue
@@ -347,10 +388,25 @@ class Table(object):
     def query(self, index=None, from_key=None, to_key=None,
               include_value=False, include_stop=True, include_start=True,
               reverse=False):
-        if type(from_key) is unicode:
-            from_key = from_key.encode('ascii', 'replace')
-        if type(to_key) is unicode:
-            to_key = to_key.encode('ascii', 'replace')
+        """Iterate over key, value pairs
+
+        Args:
+            index ([type], optional): Defaults to None. [description]
+            from_key ([type], optional): Defaults to None. [description]
+            to_key ([type], optional): Defaults to None. [description]
+            include_value (bool, optional): Defaults to False. [description]
+            include_stop (bool, optional): Defaults to True. [description]
+            include_start (bool, optional): Defaults to True. [description]
+            reverse (bool, optional): Defaults to False. [description]
+        
+        Returns:
+            [type]: [description]
+        """
+
+        if isinstance(from_key, str):
+            from_key = from_key.encode('utf-8')
+        if isinstance(to_key, str):
+            to_key = to_key.encode('utf-8')
 
         if index is None:
             return self._query_by_indicator(
@@ -406,7 +462,9 @@ class Table(object):
                         include_value=False, include_stop=True,
                         include_start=True, reverse=False):
         if index not in self.indexes:
-            raise ValueError()
+            raise ValueError('Unknown index: {} - indexes: {}'.format(
+                index, list(self.indexes.keys())
+            ))
 
         idxid = self.indexes[index]['id']
 
@@ -471,8 +529,8 @@ class Table(object):
                 gevent.idle()
 
                 counter = 0
-                for idx in self.indexes.keys():
-                    for i in self.query(index=idx, include_value=False):
+                for idx in list(self.indexes.keys()):
+                    for _ in self.query(index=idx, include_value=False):
                         if counter % 512 == 0:
                             gevent.sleep(0.001)  # yield to other greenlets
                         counter += 1
@@ -515,7 +573,7 @@ class Table(object):
 
         LOG.info('Scanning indexes...')
         last_global_id = 0
-        for i, idata in indexes.iteritems():
+        for i, idata in indexes.items():
             from_key = struct.pack("BBB", 2, idata['id'], 0xF0)
             include_start = False
             to_key = struct.pack("BBB", 2, idata['id'], 0xF1)
@@ -530,7 +588,7 @@ class Table(object):
                 reverse=False
             )
             with ri:
-                for ikey, ekey in ri:
+                for _, ekey in ri:
                     iversion = struct.unpack(">Q", ekey[:8])[0]
                     if iversion > last_global_id:
                         last_global_id = iversion+1

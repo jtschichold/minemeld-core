@@ -28,7 +28,7 @@ import gevent.monkey
 gevent.monkey.patch_all(thread=False, select=False)
 
 import minemeld.mgmtbus
-import minemeld.ft
+import minemeld.nodes
 import minemeld.fabric
 
 LOG = logging.getLogger(__name__)
@@ -94,7 +94,7 @@ class Chassis(object):
             LOG.debug(ftconfig)
 
             # new FT
-            newfts[ft] = minemeld.ft.factory(
+            newfts[ft] = minemeld.nodes.factory(
                 ftconfig['class'],
                 name=ft,
                 chassis=self,
@@ -189,7 +189,7 @@ class Chassis(object):
 
     def fts_init(self):
         for ft in self.fts.values():
-            if ft.get_state() < minemeld.ft.ft_states.INIT:
+            if ft.get_state() < minemeld.nodes.ft_states.INIT:
                 return False
         return True
 

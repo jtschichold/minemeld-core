@@ -76,7 +76,7 @@ def get_taxii_feeds():
     result = []
     for node, node_status in status.items():
         class_ = node_status.get('class', None)
-        if class_ != 'minemeld.ft.taxii.DataFeed':
+        if class_ != 'minemeld.nodes.taxii.DataFeed':
             continue
 
         _, _, feedname = node.split(':', 2)

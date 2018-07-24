@@ -16,7 +16,7 @@ import yaml
 
 from flask import jsonify, request
 
-import minemeld.ft.condition
+import minemeld.nodes.condition
 from .aaa import MMBlueprint
 from .logger import LOG
 
@@ -62,7 +62,7 @@ def validate_syslogminerrule():
 
     for c in conditions:
         try:
-            minemeld.ft.condition.Condition(c)
+            minemeld.nodes.condition.Condition(c)
         except Exception as e:
             return _return_validation_error(
                 'Condition %s is not valid' % c
