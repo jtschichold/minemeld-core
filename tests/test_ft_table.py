@@ -59,6 +59,55 @@ class MineMeldFTTableTests(unittest.TestCase):
         self.assertEqual(table.num_indicators, 0)
         table.close()
 
+    def test_basic(self):
+        table = minemeld.ft.table.Table(TABLENAME)
+        table.create_index('a')
+        table.create_index('b')
+        table.create_index('a')
+
+        self.assertIsNone(table.get('paperoga'))
+        self.assertIsNone(table.get('paperoga'.encode('utf-8')))
+
+        with self.assertRaises(ValueError):
+            table.put('paperoga', 10)
+
+        table.put('paperoga', dict(a=10))
+        self.assertEqual(
+            table.get('paperoga'),
+            dict(a=10)
+        )
+
+        table.close()
+
+        table = minemeld.ft.table.Table(TABLENAME)
+        self.assertEqual(
+            table.get('paperoga'.encode('utf-8')),
+            dict(a=10)
+        )
+        table.delete('paperoga')
+        table.delete('paperoga'.encode('utf-8'))
+
+        self.assertIsNone(table.get('paperoga'))
+        table.close()
+
+    def test_indexes(self):
+        table = minemeld.ft.table.Table(TABLENAME)
+        table.create_index('s')
+        table.put('k', dict(s='test00'))
+
+        with self.assertRaises(ValueError):
+            table.put('k2', dict(s=[]))
+
+        table.put('k2', dict(s='test00'))
+        table.put('k3', dict(s='test01'))
+
+
+        self.assertListEqual(
+            list(table.query('s')),
+            ['k', 'k2', 'k3']
+        )
+        table.close()
+
     def test_insert(self):
         table = minemeld.ft.table.Table(TABLENAME)
         table.create_index('a')
@@ -74,9 +123,11 @@ class MineMeldFTTableTests(unittest.TestCase):
     def test_index_query(self):
         table = minemeld.ft.table.Table(TABLENAME)
         table.create_index('a')
+        table.close()
 
+        table = minemeld.ft.table.Table(TABLENAME)
         num_below_500 = 0
-        for i in xrange(NUM_ELEMENTS):
+        for i in range(NUM_ELEMENTS):
             value = {'a': random.randint(0, 1000)}
             key = 'i%d' % i
             table.put(key, value)
@@ -84,7 +135,7 @@ class MineMeldFTTableTests(unittest.TestCase):
                 num_below_500 += 1
 
         j = 0
-        for k, v in table.query('a', from_key=0, to_key=500,
+        for _, _ in table.query('a', from_key=0, to_key=500,
                                 include_value=True):
             j += 1
 
@@ -95,13 +146,13 @@ class MineMeldFTTableTests(unittest.TestCase):
         table = minemeld.ft.table.Table(TABLENAME)
         table.create_index('a')
 
-        for i in xrange(NUM_ELEMENTS):
+        for i in range(NUM_ELEMENTS):
             value = {'a': 1483184218151+random.randint(600, 1000)}
             key = 'i%d' % i
             table.put(key, value)
 
         num_below_500 = 0
-        for i in xrange(NUM_ELEMENTS):
+        for i in range(NUM_ELEMENTS):
             value = {'a': 1483184218151+random.randint(0, 1000)}
             key = 'i%d' % i
             table.put(key, value)
@@ -109,7 +160,7 @@ class MineMeldFTTableTests(unittest.TestCase):
                 num_below_500 += 1
 
         j = 0
-        for k, v in table.query('a', to_key=1483184218151+500,
+        for _, _ in table.query('a', to_key=1483184218151+500,
                                 include_value=True):
             j += 1
 
@@ -120,17 +171,17 @@ class MineMeldFTTableTests(unittest.TestCase):
         table = minemeld.ft.table.Table(TABLENAME)
         table.create_index('a')
 
-        for i in xrange(NUM_ELEMENTS):
+        for i in range(NUM_ELEMENTS):
             value = {'a': 1483184218151+random.randint(0, 500)}
             key = 'i%d' % i
             table.put(key, value)
 
-        for i in xrange(NUM_ELEMENTS):
+        for i in range(NUM_ELEMENTS):
             key = 'i%d' % i
             table.delete(key)
 
         num_below_500 = 0
-        for i in xrange(NUM_ELEMENTS):
+        for i in range(NUM_ELEMENTS):
             value = {'a': 1483184218151+random.randint(0, 1000)}
             key = 'i%d' % i
             table.put(key, value)
@@ -138,11 +189,38 @@ class MineMeldFTTableTests(unittest.TestCase):
                 num_below_500 += 1
 
         j = 0
-        for k, v in table.query('a', to_key=1483184218151+500,
+        for _, _ in table.query('a', to_key=1483184218151+500,
                                 include_value=True):
             j += 1
 
         self.assertEqual(j, num_below_500)
+        table.close()
+
+    def test_metadata(self):
+        test = dict(test=random.randint(0, 100000))
+
+        table = minemeld.ft.table.Table(TABLENAME)
+        self.assertIsNone(table.get_custom_metadata())
+
+        table.set_custom_metadata(metadata=test)
+        self.assertEqual(
+            test,
+            table.get_custom_metadata()
+        )
+        table.close()
+
+        table = minemeld.ft.table.Table(TABLENAME)
+        self.assertEqual(
+            test,
+            table.get_custom_metadata()
+        )
+
+        table.set_custom_metadata(metadata=None)
+        self.assertIsNone(table.get_custom_metadata())
+        table.close()
+
+        table = minemeld.ft.table.Table(TABLENAME)
+        self.assertIsNone(table.get_custom_metadata())
         table.close()
 
     def test_query(self):
@@ -155,10 +233,40 @@ class MineMeldFTTableTests(unittest.TestCase):
             table.put(key, value)
 
         j = 0
-        for k, v in table.query(include_value=True):
+        for _, _ in table.query(include_value=True):
             j += 1
 
         self.assertEqual(j, NUM_ELEMENTS)
+        table.close()
+
+    def test_query_range(self):
+        table = minemeld.ft.table.Table(TABLENAME)
+        table.create_index('a')
+
+        for i in range(NUM_ELEMENTS):
+            value = {'a': random.randint(0, 500)}
+            key = 'i%08x' % i
+            table.put(key, value)
+
+        # this should generate a stale index entry
+        lastk = 'i%08x' % (NUM_ELEMENTS+1)
+        value = dict(a=501)
+        table.put(lastk, value)
+        table.delete(lastk)
+
+        with self.assertRaises(ValueError):
+            list(table.query(index='b'))
+
+        j = 0
+        for _ in table.query(from_key='i00000000', to_key='iFFFFFFFF', include_start=True, include_stop=True, include_value=False):
+            j += 1
+        self.assertEqual(j, NUM_ELEMENTS)
+
+        j = 0
+        for _ in table.query('a', include_start=True, include_stop=True, include_value=False):
+            j += 1
+        self.assertEqual(j, NUM_ELEMENTS)
+
         table.close()
 
     def test_exists(self):
@@ -233,7 +341,7 @@ class MineMeldFTTableTests(unittest.TestCase):
         # check sorted query retrieval
         flatdict = sorted(d.items(), key=lambda x: x[1]['a'])
         j = 0
-        for k, v in table.query('a', from_key=0, to_key=500,
+        for _, v in table.query('a', from_key=0, to_key=500,
                                 include_value=True):
             de = flatdict[j]
             self.assertEqual(de[1]['a'], v['a'])
@@ -260,7 +368,7 @@ class MineMeldFTTableTests(unittest.TestCase):
             self.assertEqual(table.num_indicators, len(d.keys()))
             flatdict = sorted(d.items(), key=lambda x: x[1]['a'])
             j = 0
-            for k, v in table.query('a', from_key=0, to_key=500,
+            for _, v in table.query('a', from_key=0, to_key=500,
                                     include_value=True):
                 de = flatdict[j]
                 # check sorting
@@ -280,7 +388,7 @@ class MineMeldFTTableTests(unittest.TestCase):
         # check sort again
         flatdict = sorted(d.items(), key=lambda x: x[1]['a'])
         j = 0
-        for k, v in table.query('a', from_key=0, to_key=500,
+        for _, v in table.query('a', from_key=0, to_key=500,
                                 include_value=True):
             de = flatdict[j]
             self.assertEqual(de[1]['a'], v['a'])
@@ -297,13 +405,13 @@ class MineMeldFTTableTests(unittest.TestCase):
         d = {}
 
         t1 = time.time()
-        for i in xrange(100000):
+        for i in range(100000):
             value = {'a': random.randint(0, 500)}
             key = 'i%d' % i
             d[key] = value
             table.put(key, value)
         t2 = time.time()
-        print 'TIME: Written %d elements in %s secs' % (100000, t2-t1)
+        print('TIME: Written {} elements in {} secs'.format(100000, t2-t1))
 
         # check number of indicators added
         self.assertEqual(table.num_indicators, len(d.keys()))

@@ -188,11 +188,11 @@ class MineMeldFTSTTests(unittest.TestCase):
     def _random_map(self, nbits=10, nintervals=1000):
         epmax = (1 << nbits)-1
 
-        rmap = [set() for i in xrange(epmax+1)]
+        rmap = [set() for i in range(epmax+1)]
 
         st = minemeld.ft.st.ST(TABLENAME, nbits, truncate=True)
 
-        for j in xrange(nintervals):
+        for _ in range(nintervals):
             sid = uuid.uuid4().bytes
             end = random.randint(0, epmax)
             start = random.randint(0, epmax)
@@ -200,11 +200,11 @@ class MineMeldFTSTTests(unittest.TestCase):
                 start, end = end, start
             st.put(sid, start, end, level=1)
 
-            for k in xrange(start, end+1):
+            for k in range(start, end+1):
                 rmap[k].add(sid)
 
         eps = []
-        for ep, lvl, t, id_ in st.query_endpoints():
+        for ep, _, _, _ in st.query_endpoints():
             if ep == 0 or ep == epmax:
                 self.assertTrue(len(rmap[ep]) > 0)
             else:
@@ -244,7 +244,7 @@ class MineMeldFTSTTests(unittest.TestCase):
         st = minemeld.ft.st.ST(TABLENAME, 32, truncate=True)
 
         t1 = time.time()
-        for j in xrange(num_intervals):
+        for _ in range(num_intervals):
             end = random.randint(0, 0xFFFFFFFF)
             if random.randint(0, 1) == 0:
                 end = end & 0xFFFFFF00
@@ -256,7 +256,7 @@ class MineMeldFTSTTests(unittest.TestCase):
         dt = t2-t1
 
         t1 = time.time()
-        for j in xrange(num_intervals):
+        for _ in range(num_intervals):
             end = random.randint(0, 0xFFFFFFFF)
             if random.randint(0, 1) == 0:
                 start = end & 0xFFFFFF00
@@ -266,7 +266,7 @@ class MineMeldFTSTTests(unittest.TestCase):
             sid = uuid.uuid4().bytes
             st.put(sid, start, end)
         t2 = time.time()
-        print "TIME: Inserted %d intervals in %d" % (num_intervals, (t2-t1-dt))
+        print("TIME: Inserted {} intervals in {}".format(num_intervals, (t2-t1-dt)))
 
         self.assertEqual(st.num_segments, num_intervals)
         self.assertEqual(st.num_endpoints, num_intervals*2)
@@ -279,7 +279,7 @@ class MineMeldFTSTTests(unittest.TestCase):
         st = minemeld.ft.st.ST(TABLENAME, 32, truncate=True)
 
         t1 = time.time()
-        for j in xrange(num_intervals):
+        for _ in range(num_intervals):
             end = random.randint(0, 0xFFFFFFFF)
             start = random.randint(0, end)
             sid = uuid.uuid4().bytes
@@ -287,22 +287,21 @@ class MineMeldFTSTTests(unittest.TestCase):
         dt = t2-t1
 
         t1 = time.time()
-        for j in xrange(num_intervals):
+        for _ in range(num_intervals):
             end = random.randint(0, 0xFFFFFFFF)
             start = random.randint(0, end)
             sid = uuid.uuid4().bytes
             st.put(sid, start, end)
         t2 = time.time()
-        print "TIME: Inserted %d intervals in %d" % (num_intervals, (t2-t1-dt))
+        print("TIME: Inserted {} intervals in {}".format(num_intervals, (t2-t1-dt)))
 
         num_queries = 100000
 
         t1 = time.time()
-        j = 0
-        for j in xrange(num_queries):
+        for _ in range(num_queries):
             q = random.randint(0, 0xFFFFFFFF)
             next(st.cover(q), None)
         t2 = time.time()
-        print "TIME: Queried %d times in %d" % (num_queries, (t2-t1))
+        print("TIME: Queried {} times in {}".format(num_queries, (t2-t1)))
 
         st.close()
