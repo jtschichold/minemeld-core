@@ -108,7 +108,7 @@ def list(entrypoint_group):
         _initialize_entry_point_group(entrypoint_group)
     eg = _ENTRYPOINT_GROUPS[entrypoint_group]
 
-    return eg.keys()
+    return list(eg.keys())
 
 
 def map(entrypoint_group):
