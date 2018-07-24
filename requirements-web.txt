@@ -5,3 +5,4 @@ Flask-Login
 passlib
 rrdtool
 git+https://github.com/Supervisor/supervisor.git@master#egg=supervisor
+blinker

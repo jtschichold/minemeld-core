@@ -143,6 +143,7 @@ def _set_stanza(stanza, value, version, config_key=REDIS_KEY_CONFIG):
     version_key = stanza+':version'
     cversion = SR.hget(config_key, version_key)
     if cversion is not None:
+        cversion = cversion.decode('utf-8')
         if version != MMConfigVersion(version=cversion):
             raise VersionMismatchError('version mismatch, current version %s' %
                                        cversion)
@@ -161,6 +162,7 @@ def _get_stanza(stanza, config_key=REDIS_KEY_CONFIG):
     version = SR.hget(config_key, version_key)
     if version is None:
         return None
+    version = version.decode('utf-8')
 
     value = SR.hget(config_key, stanza)
     if value is None:
@@ -313,10 +315,11 @@ def _config_info():
     version = SR.hget(REDIS_KEY_CONFIG, 'version')
     if version is None:
         raise ValueError('candidate config not initialized')
+    version = version.decode('utf-8')
 
     fabric = SR.hget(REDIS_KEY_CONFIG, 'fabric') is not None
     mgmtbus = SR.hget(REDIS_KEY_CONFIG, 'mgmtbus') is not None
-    changed = SR.hget(REDIS_KEY_CONFIG, 'changed') == "1"
+    changed = SR.hget(REDIS_KEY_CONFIG, 'changed') == b'1'
     next_node_id = int(SR.hget(REDIS_KEY_CONFIG, 'next_node_id'))
 
     return {
@@ -460,6 +463,7 @@ def get_config_full():
     except Exception as e:
         return jsonify(error={'message': str(e)}), 500
 
+    LOG.debug('{!r}'.format(result))
     return jsonify(result=result)
 
 

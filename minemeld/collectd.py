@@ -49,13 +49,13 @@ class CollectdClient(object):
         data = None
         while data != '\n':
             data = self.socket.recv(1)
-            if data == '\n' or data is None:
+            if data == b'\n' or data is None:
                 return result
-            result += data
+            result += data.decode('utf-8')
 
     def _send_cmd(self, command):
         self._open_socket()
-        self.socket.send(command+'\n')
+        self.socket.send((command+'\n').encode('utf-8'))
 
         ans = self._readline()
         status, message = ans.split(None, 1)

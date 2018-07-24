@@ -18,8 +18,8 @@ from functools import wraps
 
 import gevent
 import gevent.lock
-import flask_login
 from flask import current_app, Blueprint, request
+import flask_login
 
 from . import config
 from .logger import LOG

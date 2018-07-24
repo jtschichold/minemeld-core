@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from flask import request, jsonify
-import flask.ext.login
+import flask_login
 
 from . import aaa
 from .logger import LOG
@@ -39,11 +39,11 @@ def login():
     if user is None:
         return jsonify(error="Wrong credentials"), 401
 
-    flask.ext.login.login_user(user)
+    flask_login.login_user(user)
     return 'OK'
 
 
 @BLUEPRINT.route('/logout', methods=['GET'], login_required=False, read_write=False)
 def logout():
-    flask.ext.login.logout_user()
+    flask_login.logout_user()
     return 'OK'

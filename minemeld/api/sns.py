@@ -27,7 +27,7 @@ class Sns(object):
         return self.init_ok
 
     def _init_uuid(self):
-        uuid_error = uuid.UUID(bytes='\x01' * 16).hex
+        uuid_error = uuid.UUID(bytes=b'\x01' * 16).hex
         # Test case 1: UUIDFILENAME file does not exist. We try to create a new uuid and store in the filesystem
         if not os.path.isfile(self.filename):
             self.uuid = uuid.uuid4().hex
