@@ -34,6 +34,7 @@ import uuid
 import collections
 import time
 import hashlib
+import os
 
 import gevent
 import gevent.event
@@ -63,19 +64,18 @@ class MgmtbusMaster(object):
     """MineMeld engine management bus master
 
     Args:
-        ftlist (list): list of nodes
         config (dict): config
         comm_class (string): communication backend to be used
         comm_config (dict): config for the communication backend
     """
-    def __init__(self, ftlist, config, comm_class, comm_config, num_chassis):
-        super(MgmtbusMaster, self).__init__()
+    def __init__(self, comm_class, comm_config):
+        super().__init__()
 
-        self.ftlist = ftlist
-        self.config = config
+        self.num_chassis = 0
+        self.ftlist = []
+
         self.comm_config = comm_config
         self.comm_class = comm_class
-        self.num_chassis = num_chassis
 
         self._chassis = []
         self._all_chassis_ready = gevent.event.Event()
@@ -88,7 +88,7 @@ class MgmtbusMaster(object):
         self._status = {}
 
         self.SR = redis.StrictRedis.from_url(
-            self.config.get('REDIS_URL', 'unix:///var/run/redis/redis.sock')
+            os.environ.get('REDIS_URL', 'unix:///var/run/redis/redis.sock')
         )
 
         self.comm = minemeld.comm.factory(self.comm_class, self.comm_config)
@@ -110,6 +110,19 @@ class MgmtbusMaster(object):
             obj=self,
             allowed_methods=['status']
         )
+
+    def init(self, num_chassis, ftlist):
+        """Set graph parameters
+        
+        Args:
+            num_chassis (int): number of chassis
+            ftlist (list): list of node IDs
+        """
+
+        self.num_chassis = num_chassis
+        self.ftlist = ftlist
+        self._chassis = []
+        self._all_chassis_ready.clear()
 
     def rpc_status(self):
         """Returns collected status via RPC
@@ -312,7 +325,7 @@ class MgmtbusMaster(object):
             answers (list): list of metrics
             interval (int): collection interval
         """
-        collectd_socket = self.config.get(
+        collectd_socket = os.environ.get(
             'COLLECTD_SOCKET',
             '/var/run/collectd.sock'
         )
@@ -387,7 +400,7 @@ class MgmtbusMaster(object):
         """Greenlet that periodically retrieves metrics from nodes and sends
         them to collected.
         """
-        loop_interval = self.config.get('STATUS_INTERVAL', '60')
+        loop_interval = os.environ.get('STATUS_INTERVAL', '60')
         try:
             loop_interval = int(loop_interval)
         except ValueError:
@@ -473,8 +486,7 @@ class MgmtbusSlaveHub(object):
         comm_config (dict): config for the communication backend
     """
 
-    def __init__(self, config, comm_class, comm_config):
-        self.config = config
+    def __init__(self, comm_class, comm_config):
         self.comm_config = comm_config
         self.comm_class = comm_class
 
@@ -555,35 +567,10 @@ class MgmtbusSlaveHub(object):
         self.comm.stop()
 
 
-def master_factory(config, comm_class, comm_config, nodes, num_chassis):
-    """Factory of management bus master instances
-
-    Args:
-        config (dict): management bus master config
-        comm_class (string): communication backend.
-            Unused, ZMQRedis is always used
-        comm_config (dict): config of the communication backend
-        fts (list): list of nodes
-
-    Returns:
-        Instance of minemeld.mgmtbus.MgmtbusMaster class
-    """
-    _ = comm_class  # noqa
-
-    return MgmtbusMaster(
-        ftlist=nodes,
-        config=config,
-        comm_class='ZMQRedis',
-        comm_config=comm_config,
-        num_chassis=num_chassis
-    )
-
-
-def slave_hub_factory(config, comm_class, comm_config):
+def slave_hub_factory(comm_class, comm_config):
     """Factory of management bus slave hub instances
 
     Args:
-        config (dict): management bus master config
         comm_class (string): communication backend.
             Unused, ZMQRedis is always used
         comm_config (dict): config of the communication backend.
@@ -591,10 +578,8 @@ def slave_hub_factory(config, comm_class, comm_config):
     Returns:
         Instance of minemeld.mgmtbus.MgmtbusSlaveHub class
     """
-    _ = comm_class  # noqa
 
     return MgmtbusSlaveHub(
-        config,
-        'ZMQRedis',
+        comm_class,
         comm_config
     )

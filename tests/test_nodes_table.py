@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""FT Table tests
+"""Node Table tests
 
 Unit tests for minemeld.nodes.table
 """

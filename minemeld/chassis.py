@@ -42,9 +42,8 @@ class Chassis(object):
         fabricclass (str): class for the fabric
         fabricconfig (dict): config dictionary for fabric,
             class specific
-        mgmtbusconfig (dict): config dictionary for mgmt bus
     """
-    def __init__(self, fabricclass, fabricconfig, mgmtbusconfig):
+    def __init__(self, fabricclass, fabricconfig):
         self.chassis_id = os.getpid()
 
         self.fts = {}
@@ -59,9 +58,8 @@ class Chassis(object):
         )
 
         self.mgmtbus = minemeld.mgmtbus.slave_hub_factory(
-            mgmtbusconfig['slave'],
-            mgmtbusconfig['transport']['class'],
-            mgmtbusconfig['transport']['config']
+            comm_class='ZMQRedis',
+            comm_config={}
         )
         self.mgmtbus.add_failure_listener(self.mgmtbus_failed)
         self.mgmtbus.request_chassis_rpc_channel(self)
@@ -231,3 +229,46 @@ class Chassis(object):
             ft.start()
 
         self.fabric.start_dispatching()
+
+
+def main(fts):
+    """Executes the chassis
+    
+    Args:
+        fts (dict): dictionary of nodes
+    """
+
+    import signal
+
+    try:
+        # lower priority to make master and web
+        # more "responsive"
+        os.nice(5)
+
+        c = minemeld.chassis.Chassis(
+            fabricclass='ZMQRedis',
+            fabricconfig={}
+        )
+        c.configure(fts)
+
+        gevent.signal(signal.SIGUSR1, c.stop)
+
+        while not c.fts_init():
+            if c.poweroff.wait(timeout=0.1) is not None:
+                break
+
+            gevent.sleep(1)
+
+        LOG.info('Nodes initialized')
+
+        try:
+            c.poweroff.wait()
+            LOG.info('power off')
+
+        except KeyboardInterrupt:
+            LOG.error("We should not be here !")
+            c.stop()
+
+    except:
+        LOG.exception('Exception in chassis main procedure')
+        raise

@@ -1,14 +1,16 @@
 import json
-
 from collections import namedtuple
 
 import yaml
+
+from minemeld.utils import diff_dicts
 
 
 __all__ = [
     'CHANGE_ADDED', 'CHANGE_DELETED',
     'CHANGE_INPUT_ADDED', 'CHANGE_INPUT_DELETED',
-    'CHANGE_OUTPUT_ENABLED', 'CHANGE_OUTPUT_DISABLED'
+    'CHANGE_OUTPUT_ENABLED', 'CHANGE_OUTPUT_DISABLED',
+    'CHANGE_CONFIG'
 ]
 
 
@@ -18,6 +20,7 @@ CHANGE_INPUT_ADDED = 2
 CHANGE_INPUT_DELETED = 3
 CHANGE_OUTPUT_ENABLED = 4
 CHANGE_OUTPUT_DISABLED = 5
+CHANGE_CONFIG = 6
 
 
 ConfigChange = namedtuple(
@@ -107,16 +110,16 @@ class MineMeldConfig(Config):
             )
             self.changes.append(change)
 
-        # check inputs/output for untouched
+        # check inputs/output and config for untouched
         for snode in untouched:
             nodename, nodeclass = json.loads(snode)
 
+            # check inputs
             my_inputs = set(self.nodes[nodename].get('inputs', []))
             other_inputs = set(oconfig.nodes[nodename].get('inputs', []))
 
             iadded = my_inputs - other_inputs
             ideleted = other_inputs - my_inputs
-
             for i in iadded:
                 change = MineMeldConfigChange(
                     nodename=nodename,
@@ -135,22 +138,31 @@ class MineMeldConfig(Config):
                 )
                 self.changes.append(change)
 
+            # check output
             my_output = self.nodes[nodename].get('output', False)
             other_output = oconfig.nodes[nodename].get('output', False)
+            if my_output != other_output:
+                change_type = CHANGE_OUTPUT_DISABLED
+                if my_output:
+                    change_type = CHANGE_OUTPUT_ENABLED
 
-            if my_output == other_output:
-                continue
+                change = MineMeldConfigChange(
+                    nodename=nodename,
+                    nodeclass=nodeclass,
+                    change=change_type
+                )
+                self.changes.append(change)
 
-            change_type = CHANGE_OUTPUT_DISABLED
-            if my_output:
-                change_type = CHANGE_OUTPUT_ENABLED
-
-            change = MineMeldConfigChange(
-                nodename=nodename,
-                nodeclass=nodeclass,
-                change=change_type
-            )
-            self.changes.append(change)
+            # check config
+            my_config = self.nodes[nodename].get('config', {})
+            other_config = oconfig.nodes[nodename].get('config', {})
+            for changedp in diff_dicts(my_config, other_config):
+                self.changes.append(MineMeldConfigChange(
+                    nodename=nodename,
+                    nodeclass=nodeclass,
+                    change=CHANGE_CONFIG,
+                    detail=changedp
+                ))
 
     @classmethod
     def from_dict(cls, dconfig=None):

@@ -32,7 +32,7 @@ import ujson as json
 from errno import EAGAIN
 
 import redis
-import zmq.green as zmq  # pylint:disable=E0401
+import zmq.green as zmq
 
 LOG = logging.getLogger(__name__)
 
