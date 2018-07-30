@@ -17,8 +17,6 @@ This module implements minemeld.nodes.plaintext.Miner, the Miner node for plain
 text feeds over HTTP/HTTPS.
 """
 
-from builtins import map
-from builtins import filter
 import requests
 import logging
 import re

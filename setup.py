@@ -80,12 +80,15 @@ setup(
     ],
     long_description=_long_description,
     packages=_packages,
+    package_data = {
+        '': ['schemas/*.yml', 'schemas/*.json']
+    },
     provides=['minemeld'],
     install_requires=_requirements,
     ext_modules=cythonize([GDNS]),
     entry_points={
         'console_scripts': [
-            'mm-engine = minemeld.run.launcher:main',
+            'mm-engine = minemeld.run.engine:main',
             'mm-console = minemeld.run.console:main',
             'mm-traced = minemeld.traced.main:main',
             'mm-traced-purge = minemeld.traced.purge:main',

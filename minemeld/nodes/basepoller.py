@@ -23,6 +23,7 @@ import random
 import collections
 import sys
 import shutil
+import os.path
 
 import gevent
 import gevent.event
@@ -367,7 +368,7 @@ class BasePollerNode(base.BaseNode):
 
     def _initialize_table(self, truncate=False):
         self.table = _bptable_factory(
-            self.name,
+            os.path.join(self.name, 'indicators'),
             truncate=truncate,
             type_in_key=self.multiple_indicator_types
         )
@@ -385,7 +386,7 @@ class BasePollerNode(base.BaseNode):
         self.saved_state_reset()
         self._initialize_table(truncate=True)
 
-    @base.BaseNode.state.setter
+    @base.BaseNode.state.setter  # pylint:disable=E1101
     def state(self, value):
         LOG.debug("%s - acquiring state write lock", self.name)
         self.state_lock.lock()
@@ -538,7 +539,7 @@ class BasePollerNode(base.BaseNode):
 
     def _aggregate_iterator(self, iterator):
         self.agg_table = _bptable_factory(
-            '{}.aggregate-temp'.format(self.name),
+            os.path.join(self.name, 'aggregate-temp'),
             truncate=True,
             type_in_key=True
         )
@@ -711,7 +712,7 @@ class BasePollerNode(base.BaseNode):
             iterator.close()
             self.agg_table.close()
             self.agg_table = None
-            shutil.rmtree('{}.aggregate-temp'.format(self.name))
+            shutil.rmtree(os.path.join(self.name, 'aggregate-temp'))
 
         if aggregation_exc is not None:
             LOG.info('{} - Reraising exception happened during aggregation'.format(self.name))
@@ -923,7 +924,7 @@ class BasePollerNode(base.BaseNode):
 
     def mgmtbus_signal(self, source=None, signal=None, **kwargs):
         if signal != 'flush':
-            super().mgmtbus_signal(
+            return super().mgmtbus_signal(
                 source=source,
                 signal=signal,
                 **kwargs
@@ -989,9 +990,3 @@ class BasePollerNode(base.BaseNode):
         self.table.close()
 
         LOG.info("%s - # indicators: %d", self.name, self.table.length())
-
-    @staticmethod
-    def gc(name, config=None):
-        base.BaseNode.gc(name, config=config)
-        shutil.rmtree(name, ignore_errors=True)
-        shutil.rmtree('{}.aggregate-temp'.format(name), ignore_errors=True)

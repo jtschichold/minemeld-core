@@ -32,7 +32,7 @@ import ujson as json
 from errno import EAGAIN
 
 import redis
-import zmq.green as zmq
+import zmq.green as zmq  # pylint:disable=E0401
 
 LOG = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ class RedisPubChannel(object):
         minqname = '{}:queue:{:013X}'.format(
             self.prefix,
             minhighbits
-        )
+        ).encode('utf-8')
 
         # delete all the lists before the lagger
         queues = self.SR.keys('{}:queue:*'.format(self.prefix))

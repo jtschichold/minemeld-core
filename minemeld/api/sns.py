@@ -77,7 +77,7 @@ class Sns(object):
         except Exception:
             LOG.exception('Failure sending the message to the sns cloud provider')
             return False
-        if r.status_code == requests.codes.ok:
+        if r.status_code == requests.codes.ok:  # pylint:disable=E1101
             response = r.json()
             if response.get('response', '') == 'ok':
                 return True

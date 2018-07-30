@@ -99,7 +99,8 @@ def _lock_timeout(resource, timeout=30):
         if result is not None:
             return result
 
-        t1 = time.sleep(0.01)
+        time.sleep(0.01)
+        t1 = time.time()
 
     return None
 

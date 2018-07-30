@@ -1,0 +1,16 @@
+- id: minemeld.nodes.base.BaseNode
+  name: Base node class
+  node_type: unknown
+  config_schema: base-basenode-config.json
+  internal: true
+- id: minemeld.nodes.basepoller.BasePollerNode
+  name: BasePoller node class
+  node_type: miner
+  config_schema: basepoller-basepollernode-config.json
+  internal: true
+- id: minemeld.nodes.plaintext.Miner
+  name: Miner for plain text feeds over HTTP
+  node_type: miner
+  signals: [ { name: poll, value: hup }, flush ]
+  config_schema: plaintext-miner-config.json
+  config_runtime_properties: ['verify_cert']

@@ -16,7 +16,7 @@ import os
 import os.path
 import hashlib
 
-import rrdtool
+import rrdtool  # pylint:disable=E0401
 
 from flask import request, jsonify
 

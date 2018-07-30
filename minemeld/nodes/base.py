@@ -113,7 +113,7 @@ class Filters(object):
         return indicator, d
 
 
-def _counting(statsname):
+def counting(statsname):
     """Decorator for counting calls to decorated instance methods.
     Counters are stored in statistics attribute of the instance.
 
@@ -229,7 +229,7 @@ class BaseNode(object):
             self.publish_status(force=True)
 
     def read_checkpoint(self):
-        """Reads checkpoint file from disk.
+        """Read checkpoint file from disk.
 
         First line of the checkpoint file is a UUID, the *checkpoint* received
         before stopping. The second line is a dictionary in JSON with the class
@@ -299,7 +299,7 @@ class BaseNode(object):
             self.last_checkpoint = None
 
     def create_checkpoint(self, value):
-        """Saves checkpoint file to disk.
+        """Save checkpoint file to disk.
 
         Called by `checkpoint`.
 
@@ -322,6 +322,9 @@ class BaseNode(object):
             f.write('\n')
 
     def remove_checkpoint(self):
+        """Remove checkpoint
+        """
+
         try:
             os.remove('{}.chkp'.format(self.name))
 
@@ -329,9 +332,21 @@ class BaseNode(object):
             pass
 
     def saved_state_restore(self, saved_state):
+        """Restore state from dict
+        
+        Args:
+            saved_state (dict): state
+        """
+
         pass
 
     def saved_state_create(self):
+        """Create state dictionary ready to be serialized
+        
+        Returns:
+            dict: state
+        """
+
         return {}
 
     def configure(self):
@@ -346,6 +361,16 @@ class BaseNode(object):
         self.outfilters = Filters(self.config.get('outfilters', []))
 
     def connect(self, inputs, output):
+        """Connect the node
+        
+        Args:
+            inputs (list): list of input nodes
+            output (bool): output enabled?
+        
+        Raises:
+            AssertionError: if connect is called when node is not ready
+        """
+
         if self.state != ft_states.READY:
             LOG.error('connect called in non ready FT')
             raise AssertionError('connect called in non ready FT')
@@ -397,7 +422,7 @@ class BaseNode(object):
         return self.chassis.send_rpc(self.name, dftname, method, kwargs,
                                      block=block, timeout=timeout)
 
-    @_counting('update.tx')
+    @counting('update.tx')
     def emit_update(self, indicator, value):
         if self.output is None:
             return
@@ -425,7 +450,7 @@ class BaseNode(object):
             'value': value
         })
 
-    @_counting('withdraw.tx')
+    @counting('withdraw.tx')
     def emit_withdraw(self, indicator, value=None):
         if self.output is None:
             return
@@ -453,7 +478,7 @@ class BaseNode(object):
             'value': value
         })
 
-    @_counting('checkpoint.tx')
+    @counting('checkpoint.tx')
     def emit_checkpoint(self, value):
         if self.output is None:
             return
@@ -463,7 +488,7 @@ class BaseNode(object):
             'value': value
         })
 
-    @_counting('update.rx')
+    @counting('update.rx')
     def update(self, source=None, indicator=None, value=None):
         LOG.debug('%s {%s} - update from %s value %s',
                   self.name, self.state, source, value)
@@ -509,11 +534,11 @@ class BaseNode(object):
             value=fltvalue
         )
 
-    @_counting('update.processed')
+    @counting('update.processed')
     def filtered_update(self, source=None, indicator=None, value=None):
         raise NotImplementedError('%s: update' % self.name)
 
-    @_counting('withdraw.rx')
+    @counting('withdraw.rx')
     def withdraw(self, source=None, indicator=None, value=None):
         LOG.debug('%s {%s} - withdraw from %s value %s',
                   self.name, self.state, source, value)
@@ -553,11 +578,11 @@ class BaseNode(object):
             value=value
         )
 
-    @_counting('withdraw.processed')
+    @counting('withdraw.processed')
     def filtered_withdraw(self, source=None, indicator=None, value=None):
         raise NotImplementedError('%s: withdraw' % self.name)
 
-    @_counting('checkpoint.rx')
+    @counting('checkpoint.rx')
     def checkpoint(self, source=None, value=None):
         LOG.debug('%s {%s} - checkpoint from %s value %s',
                   self.name, self.state, source, value)
@@ -758,6 +783,9 @@ class BaseNode(object):
 
     @staticmethod
     def gc(name, config=None):
+        import shutil
+
+        shutil.rmtree(name, ignore_errors=True)
         try:
             os.remove('{}.chkp'.format(name))
         except:

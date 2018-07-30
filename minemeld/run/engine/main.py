@@ -1,98 +1,18 @@
-#  Copyright 2015-2016 Palo Alto Networks, Inc
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
-
 import gevent
 import gevent.monkey
 from minemeld.packages import gevent_openssl  # for patching pyopenssl
 gevent_openssl.monkey_patch()
 gevent.monkey.patch_all(thread=False, select=False)
 
-import os.path
-import logging
-import signal
-import multiprocessing
-import argparse
 import os
-import math
-
-import psutil
-
-import minemeld.chassis
-import minemeld.mgmtbus
-import minemeld.run.config
+import logging
+import argparse
 
 from minemeld import __version__
 
+from .master import Master
+
 LOG = logging.getLogger(__name__)
-
-
-def _run_chassis(fabricconfig, mgmtbusconfig, fts):
-    try:
-        # lower priority to make master and web
-        # more "responsive"
-        os.nice(5)
-
-        c = minemeld.chassis.Chassis(
-            fabricconfig['class'],
-            fabricconfig['config'],
-            mgmtbusconfig
-        )
-        c.configure(fts)
-
-        gevent.signal(signal.SIGUSR1, c.stop)
-
-        while not c.fts_init():
-            if c.poweroff.wait(timeout=0.1) is not None:
-                break
-
-            gevent.sleep(1)
-
-        LOG.info('Nodes initialized')
-
-        try:
-            c.poweroff.wait()
-            LOG.info('power off')
-
-        except KeyboardInterrupt:
-            LOG.error("We should not be here !")
-            c.stop()
-
-    except:
-        LOG.exception('Exception in chassis main procedure')
-        raise
-
-
-def _check_disk_space(num_nodes):
-    free_disk_per_node = int(os.environ.get(
-        'MM_DISK_SPACE_PER_NODE',
-        10*1024  # default: 10MB per node
-    ))
-    needed_disk = free_disk_per_node*num_nodes*1024
-    free_disk = psutil.disk_usage('.').free
-
-    LOG.debug('Disk space - needed: {} available: {}'.format(needed_disk, free_disk))
-
-    if free_disk <= needed_disk:
-        LOG.critical(
-            ('Not enough space left on the device, available: {} needed: {}'
-             ' - please delete traces, logs and old engine versions and restart').format(
-             free_disk, needed_disk
-            )
-        )
-        return None
-
-    return free_disk
 
 
 def _parse_args():
@@ -115,8 +35,8 @@ def _parse_args():
     )
     parser.add_argument(
         '--nodes-per-chassis',
-        default=float(os.environ.get('MM_NPC', 15.0)),
-        type=float,
+        default=int(os.environ.get('MM_NPC', 15)),
+        type=int,
         action='store',
         metavar='NPC',
         help='number of nodes per chassis (default 15)'
@@ -144,58 +64,11 @@ def _setup_environment(config):
 
 
 def main():
-    mbusmaster = None
-    processes_lock = None
-    processes = None
-    disk_space_monitor_glet = None
-
-    def _cleanup():
-        if mbusmaster is not None:
-            mbusmaster.checkpoint_graph()
-
-        if processes_lock is None:
-            return
-
-        with processes_lock:
-            if processes is None:
-                return
-
-            for p in processes:
-                if not p.is_alive():
-                    continue
-
-                try:
-                    os.kill(p.pid, signal.SIGUSR1)
-                except OSError:
-                    continue
-
-            while sum([int(t.is_alive()) for t in processes]) != 0:
-                gevent.sleep(1)
-
-    def _sigint_handler():
-        LOG.info('SIGINT received')
-        _cleanup()
-        signal_received.set()
-
-    def _sigterm_handler():
-        LOG.info('SIGTERM received')
-        _cleanup()
-        signal_received.set()
-
-    def _disk_space_monitor(num_nodes):
-        while True:
-            if _check_disk_space(num_nodes=num_nodes) is None:
-                _cleanup()
-                signal_received.set()
-                break
-
-            gevent.sleep(60)
-
     args = _parse_args()
 
     # logging
     loglevel = logging.INFO
-    if args.verbose:
+    if args.verbose or os.getenv('MM_VERBOSE'):
         loglevel = logging.DEBUG
 
     logging.basicConfig(
@@ -207,18 +80,20 @@ def main():
     LOG.info("Starting mm-engine version %s", __version__)
     LOG.info("mm-engine arguments: %s", args)
 
-    _setup_environment(args.config)
-
-    mbusmaster = minemeld.mgmtbus.master_factory(
-        config={},
-        comm_class='ZMQRedis',
-        comm_config={
-                        'num_connections': 10,
-                        'priority': gevent.core.MAXPRI  # pylint:disable=E1101
-                    },
-        nodes=[],
-        num_chassis=0
+    master = Master(
+        mp=args.multiprocessing,
+        npc=args.nodes_per_chassis,
+        config_path=args.config
     )
+    master.load()
+    input('Press a key')
+    master.shut_down.wait()
+
+    LOG.info('Master shut down, exiting...')
+    return 0
+
+"""
+    _setup_environment(args.config)
 
     # load and validate config
     config = minemeld.run.config.load_config(args.config)
@@ -319,3 +194,4 @@ def main():
 
     if disk_space_monitor_glet is not None:
         disk_space_monitor_glet.kill()
+"""
