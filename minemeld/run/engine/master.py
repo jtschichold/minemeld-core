@@ -1,17 +1,20 @@
 import gevent
 
 import os
+import sys
 import logging
 import shutil
 import time
 import signal
 import multiprocessing
+import subprocess
 import math
+import tempfile
+import json
 
 import minemeld.schemas
 from minemeld.mgmtbus import MgmtbusMaster
 from minemeld.run.config import CHANGE_CONFIG, validate
-from minemeld.chassis import main as chassis_main
 
 
 COMMITTED_CONFIG = 'committed-config.yml'
@@ -119,30 +122,12 @@ class Master(object):
             self.mgmtbusmaster.init(nchassis,list(config.nodes.keys()))
 
             with self.chassis_lock:
-                # we start the new process in a clean interpreter
-                # slower, but avoid issues with stale state
-                multiprocessing.set_start_method('spawn')
-
-                sigint_handler = signal.getsignal(signal.SIGINT)
-                sigterm_handler = signal.getsignal(signal.SIGTERM)
-                signal.signal(signal.SIGINT, signal.SIG_IGN)
-                signal.signal(signal.SIGTERM, signal.SIG_IGN)
-
                 for g in nlists:
                     if len(g) == 0:
                         continue
 
-                    p = multiprocessing.Process(
-                        target=chassis_main,
-                        args=(
-                            g,
-                        )
-                    )
+                    p = self._spawn_chassis(g)
                     self.chassis.append(p)
-                    p.start()
-
-                signal.signal(signal.SIGINT, sigint_handler)
-                signal.signal(signal.SIGTERM, sigterm_handler)
 
             self.mgmtbusmaster.wait_for_chassis(timeout=10)
             self.mgmtbusmaster.start_status_monitor()
@@ -154,6 +139,23 @@ class Master(object):
             pass
 
         self.running_config = config
+
+    def _spawn_chassis(self, nlist):
+        tf, tfpath = tempfile.mkstemp()
+
+        f = os.fdopen(tf, 'w')
+        json.dump(nlist, f)
+        f.close()
+
+        p = subprocess.Popen(
+            [
+                sys.executable,
+                '-c', 'from minemeld.run.engine.chassis import run; run({!r})'.format(tfpath)
+            ],
+            cwd=os.getcwd()
+        )
+
+        return p
 
     def _cleanup(self):
         """Cleanup existing chassis. Checkpoints the graph and terminates the chassis

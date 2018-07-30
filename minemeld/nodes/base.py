@@ -216,6 +216,9 @@ class BaseNode(object):
         self._disable_full_trace = 'MM_DISABLE_FULL_TRACE' in os.environ
         self._disable_full_trace_glet = None
 
+        if not os.path.isdir(self.name):
+            os.mkdir(self.name)
+
     @property
     def state(self):
         return self._state
