@@ -7,7 +7,10 @@ gevent.monkey.patch_all(thread=False, select=False)
 import os
 import logging
 import argparse
+import functools
+import signal
 
+import minemeld.schemas
 from minemeld import __version__
 
 from .master import Master
@@ -55,12 +58,22 @@ def _parse_args():
     return parser.parse_args()
 
 
-def _setup_environment(config):
-    # make config dir available to nodes
-    os.environ['MM_CONFIG_DIR'] = config
+def sig_handler(*args, master=None, name=None):
+    """Handler for termination signals
 
-    if not 'REQUESTS_CA_BUNDLE' in os.environ and 'MM_CA_BUNDLE' in os.environ:
-        os.environ['REQUESTS_CA_BUNDLE'] = os.environ['MM_CA_BUNDLE']
+    Args:
+        master (Master): Chassis object
+        name (str): signal name
+    """
+
+    LOG.info('{} received'.format(name))
+    master.stop()
+
+
+def reload_config(*args, master=None):
+    LOG.info('HUP received, reloading config')
+    minemeld.schemas.get(cache=False)  # force cache update
+    master.load()
 
 
 def main():
@@ -86,7 +99,11 @@ def main():
         config_path=args.config
     )
     master.load()
-    input('Press a key')
+
+    gevent.signal(signal.SIGINT, functools.partial(sig_handler, name='SIGINT', master=master))
+    gevent.signal(signal.SIGTERM, functools.partial(sig_handler, name='SIGTERM', master=master))
+    gevent.signal(signal.SIGHUP, functools.partial(reload_config, master=master))
+
     master.shut_down.wait()
 
     LOG.info('Master shut down, exiting...')

@@ -21,6 +21,9 @@ def run(ftspath):
         ftspath (str): file with dictionary of nodes
     """
 
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+
     with open(ftspath, 'r') as f:
         fts = json.load(f)
     os.remove(ftspath)

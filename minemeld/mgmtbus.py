@@ -122,6 +122,7 @@ class MgmtbusMaster(object):
         self.num_chassis = num_chassis
         self.ftlist = ftlist
         self._chassis = []
+        self._status = {}
         self._all_chassis_ready.clear()
 
     def rpc_status(self):
@@ -202,9 +203,21 @@ class MgmtbusMaster(object):
 
         return result
 
-    def _send_node_cmd(self, nodename, command, params=None):
-        """Send command to a single node
+    def send_node_cmd(self, nodename, command, params=None):
+        """Send command to single node
+        
+        Args:
+            nodename (str): node name
+            command (str): command
+            params (dict, optional): Defaults to None. Parameters for the command
+        
+        Raises:
+            RuntimeError: Timeout or error in executing command
+        
+        Returns:
+            any: result
         """
+
         if params is None:
             params = {}
 
@@ -242,7 +255,7 @@ class MgmtbusMaster(object):
         startup_plan = plan(config, state_info)
         for node, command in startup_plan.items():
             LOG.info('{} <= {}'.format(node, command))
-            self._send_node_cmd(node, command)
+            self.send_node_cmd(node, command)
 
         self.graph_status = 'INIT'
 
@@ -289,7 +302,7 @@ class MgmtbusMaster(object):
         chkp = str(uuid.uuid4())
         LOG.info('Sending checkpoint {} to nodes'.format(chkp))
         for nodename in self.ftlist:
-            self._send_node_cmd(nodename, 'checkpoint', params={'value': chkp})
+            self.send_node_cmd(nodename, 'checkpoint', params={'value': chkp})
 
         ntries = 0
         while ntries < max_tries:
@@ -529,7 +542,8 @@ class MgmtbusSlaveHub(object):
                 'mgmtbus_status',
                 'mgmtbus_checkpoint',
                 'mgmtbus_hup',
-                'mgmtbus_signal'
+                'mgmtbus_signal',
+                'mgmtbus_configure'
             ],
             method_prefix='mgmtbus_'
         )

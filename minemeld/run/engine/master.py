@@ -12,9 +12,13 @@ import math
 import tempfile
 import json
 
+import psutil
+
 import minemeld.schemas
 from minemeld.mgmtbus import MgmtbusMaster
 from minemeld.run.config import CHANGE_CONFIG, validate
+
+from .destroy import destroy_old_nodes
 
 
 COMMITTED_CONFIG = 'committed-config.yml'
@@ -37,9 +41,16 @@ class Master(object):
         self.npc = npc
         self.config_path = config_path
 
+        self.state_lock = gevent.lock.BoundedSemaphore()
+
         self.running_config = None
         self.chassis_lock = gevent.lock.BoundedSemaphore()
         self.chassis = []
+        self.monitor_glet = gevent.spawn(self._monitor)
+
+        # setup environment
+        if not 'REQUESTS_CA_BUNDLE' in os.environ and 'MM_CA_BUNDLE' in os.environ:
+            os.environ['REQUESTS_CA_BUNDLE'] = os.environ['MM_CA_BUNDLE']
 
         self.mgmtbusmaster = MgmtbusMaster(
             comm_class='ZMQRedis',
@@ -70,6 +81,10 @@ class Master(object):
             LOG.error('Invalid committed config, ignoring')
             return
 
+        if self._check_disk_space(num_nodes=len(cconfig.nodes)) is None:
+            LOG.error('Not enough disk space for the committed config, ignoring')
+            return
+
         rcvalid = True
         rcconfig = self.running_config
         if rcconfig is None:
@@ -81,6 +96,7 @@ class Master(object):
 
         self._apply_config(cconfig)
 
+        destroy_old_nodes(cconfig)
         if rcconfig is not None:
             shutil.copyfile(
                 rcpath,
@@ -91,9 +107,12 @@ class Master(object):
     def stop(self):
         """Stop master
         """
-        self.mgmtbusmaster.stop_status_monitor()
-        self._cleanup()
-        self.shut_down.set()
+
+        with self.state_lock:
+            self._cleanup()
+            self.mgmtbusmaster.stop_status_monitor()
+            self.mgmtbusmaster.stop()
+            self.shut_down.set()
 
     def _apply_config(self, config):
         restart_required = self.running_config is None 
@@ -135,12 +154,32 @@ class Master(object):
             self.mgmtbusmaster.start_chassis()
 
         else:
-            # push configurations to nodes
-            pass
+            changed_nodes = set([c.nodename for c in config.changes if c.change == CHANGE_CONFIG])
+            for cnode in changed_nodes:
+                try:
+                    self.mgmtbusmaster.send_node_cmd(
+                        nodename=cnode,
+                        command='configure',
+                        params={
+                            'config': config.nodes[cnode].get('config', {})
+                        }
+                    )
+                except RuntimeError as e:
+                    LOG.exception('Error changing config on node {}: {}'.format(cnode, str(e)))
+                    self.stop()
 
         self.running_config = config
 
     def _spawn_chassis(self, nlist):
+        """Spawn chassis with a list of nodes
+        
+        Args:
+            nlist (dict): nodes for the new chassis
+        
+        Returns:
+            Popen: Popen instance of the new chassis
+        """
+
         tf, tfpath = tempfile.mkstemp()
 
         f = os.fdopen(tf, 'w')
@@ -157,6 +196,20 @@ class Master(object):
 
         return p
 
+    def _is_chassis_alive(self, chassis):
+        """Check if chassis is still alive
+        
+        Args:
+            chassis (Popen): chassis process
+        
+        Returns:
+            bool: True if chassis is alive
+        """
+
+        rc = chassis.poll()
+
+        return rc is None
+
     def _cleanup(self):
         """Cleanup existing chassis. Checkpoints the graph and terminates the chassis
         """
@@ -169,7 +222,7 @@ class Master(object):
                 return
 
             for c in self.chassis:
-                if not c.is_alive():
+                if not self._is_chassis_alive(c):
                     continue
 
                 try:
@@ -177,7 +230,7 @@ class Master(object):
                 except OSError:
                     continue
 
-            while sum([int(t.is_alive()) for t in self.chassis]) != 0:
+            while sum([int(self._is_chassis_alive(c)) for t in self.chassis]) != 0:
                 gevent.sleep(1)
 
             self.chassis = []
@@ -223,3 +276,60 @@ class Master(object):
             result[idx % num_chassis][nid] = node
 
         return result
+
+    def _check_disk_space(self, num_nodes):
+        """Check if there is enough disk space
+        
+        Args:
+            num_nodes (int): number of nodes
+        
+        Returns:
+            int: available disk space, or None if there is not enough
+        """
+
+        free_disk_per_node = int(os.environ.get(
+            'MM_DISK_SPACE_PER_NODE',
+            10*1024  # default: 10MB per node
+        ))
+        needed_disk = free_disk_per_node*num_nodes*1024
+        free_disk = psutil.disk_usage('.').free
+
+        LOG.debug('Disk space - needed: {} available: {}'.format(needed_disk, free_disk))
+
+        if free_disk <= needed_disk:
+            LOG.critical(
+                ('Not enough space left on the device, available: {} needed: {}'
+                ' - please delete traces, logs and old engine versions and restart').format(
+                free_disk, needed_disk
+                )
+            )
+            return None
+
+        return free_disk
+
+    def _monitor(self):
+        """Monitor glet, check chassis status and disk space
+        """
+
+        last_disk_check = None
+        while not self.shut_down.is_set():
+            with self.state_lock:
+                with self.chassis_lock:
+                    r = [int(self._is_chassis_alive(t)) for t in self.chassis]
+                    if sum(r) != len(self.chassis):
+                        LOG.info("One of the chassis has stopped, exit")
+                        break
+
+                if last_disk_check is None or time.time() > last_disk_check+60:
+                    last_disk_check = time.time()
+                    num_nodes = 0
+                    if self.running_config is not None:
+                        num_nodes = len(self.running_config.nodes)
+                    if self._check_disk_space(num_nodes=num_nodes) is None:
+                        LOG.critical('Low disk space, stopping graph to avoid corruption')
+                        break
+
+            gevent.sleep(1.0)
+
+        if not self.shut_down.is_set():
+            self.stop()

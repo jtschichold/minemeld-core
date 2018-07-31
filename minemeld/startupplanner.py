@@ -4,7 +4,8 @@ from collections import defaultdict
 
 import networkx as nx
 
-from minemeld.run.config import CHANGE_INPUT_DELETED, CHANGE_ADDED, CHANGE_INPUT_ADDED
+import minemeld.schemas
+from minemeld.run.config import CHANGE_INPUT_DELETED, CHANGE_ADDED, CHANGE_INPUT_ADDED, CHANGE_CONFIG
 
 
 LOG = logging.getLogger(__name__)
@@ -79,6 +80,7 @@ def _plan_subgraph(sg, config, state_info):
     # - nodes with an old checkpoint
     # - nodes with no checkpoint but not added
     # - nodes that had an input deleted
+    # - nodes with config change not in runtime params
     invalid_nodes = []
     for nodename in sg:
         if nodename not in checkpoints[quorum_checkpoint].nodes and nodename not in checkpoints[None].nodes:
@@ -94,6 +96,25 @@ def _plan_subgraph(sg, config, state_info):
         if ideleted is not None:
             invalid_nodes.append(nodename)
             continue
+
+        # collect all config changes and get the first change to grab the class schema
+        config_changes = [c for c in changes[nodename] if c.change == CHANGE_CONFIG]
+        fchange = config_changes[0] if config_changes else None
+        if fchange is None:
+            continue
+        schema = next((s for s in minemeld.schemas.get() if s['id'] == fchange.nodeclass), None)
+        if schema is None:
+            continue
+
+        # check config changes against runtime params
+        runtime_params = schema.get('config_runtime_properties', None)
+        if runtime_params is None:
+            invalid_nodes.append(nodename)
+            continue
+        ichange = next((c for c in config_changes if c.detail not in runtime_params), None)
+        if ichange is not None:
+            invalid_nodes.append(nodename)
+            continue 
 
     # there is at least one invalid node, we reset all the nodes except for the
     # sources with checkpoint == quorum_checkpoint

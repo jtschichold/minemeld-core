@@ -192,17 +192,26 @@ def _interpolate_config_schema(nodes):
         node['config_schema'] = new_config_schema
 
 
-def get(directory=None, extensions=True):
+_CACHE = None
+
+
+def get(directory=None, extensions=True, cache=True):
     """Load node schemas
 
     Args:
         directory (str, optional): Defaults to None. Path to load schemas from, if
             None schemas from the file directory will be loaded
         extensions (bool, optional): Defaults to True. Reserved
+        cache (bool, optional): Defaults to True. Use cache
     
     Returns:
         list: node schemas
     """
+
+    global _CACHE
+
+    if cache and _CACHE is not None:
+        return _CACHE
 
     import os.path
 
@@ -237,4 +246,7 @@ def get(directory=None, extensions=True):
         LOG.exception('Error interpolating config schemas')
         return []
 
-    return list(nodes.values())
+    result = list(nodes.values())
+    _CACHE = result
+
+    return result

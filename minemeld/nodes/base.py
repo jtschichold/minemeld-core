@@ -248,12 +248,6 @@ class BaseNode(object):
         """
         self.last_checkpoint = None
 
-        config = {
-            'class': (self.__class__.__module__+'.'+self.__class__.__name__),
-            'config': self._original_config
-        }
-        config = json.dumps(config, sort_keys=True)
-
         try:
             with open(self.name+'.chkp', 'r') as f:
                 contents = f.read()
@@ -261,7 +255,7 @@ class BaseNode(object):
                     # new format
                     contents = json.loads(contents)
                     self.last_checkpoint = contents['checkpoint']
-                    saved_config = contents['config']
+                    # saved_config = contents['config']
                     saved_state = contents['state']
 
                 else:
@@ -269,30 +263,9 @@ class BaseNode(object):
                     lines = contents.splitlines()
                     self.last_checkpoint = lines[0]
 
-                    saved_config = ''
-                    if len(lines) > 1:
-                        # this to support a really old format
-                        # where only checkpoint value was saved
-                        saved_config = lines[1]
-
                     saved_state = None
 
                 LOG.debug('%s - restored checkpoint: %s', self.name, self.last_checkpoint)
-
-            # old_status is missing in old releases
-            # stick to the old behavior
-            if saved_config and saved_config != config:
-                LOG.info(
-                    '%s - saved config does not match new config',
-                    self.name
-                )
-                self.last_checkpoint = None
-                return
-
-            LOG.info(
-                '%s - saved config matches new config',
-                self.name
-            )
 
             if saved_state is not None:
                 self.saved_state_restore(saved_state)
@@ -720,6 +693,15 @@ class BaseNode(object):
             return self.hup(source=source)
 
         raise NotImplementedError('{}: signal - not implemented'.format(self.name))
+
+    def mgmtbus_configure(self, source=None, config=None):
+        self._original_config = copy.deepcopy(config)
+        self.config = config
+        self.configure()
+
+        LOG.info('{} - new config: {}'.format(self.name, self._original_config))
+
+        return 'ok'
 
     def initialize(self):
         pass
