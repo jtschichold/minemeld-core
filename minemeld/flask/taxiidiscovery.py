@@ -70,7 +70,13 @@ def taxii_discovery_service():
         if HOST_RE.match(server_host) is None:
             return 'Invalid Host header', 400
 
-    tm = libtaxii.messages_11.get_message_from_xml(request.data)
+    LOG.debug('Request: {!r}'.format(request.data))
+
+    try:
+        tm = libtaxii.messages_11.get_message_from_xml(request.data)
+    except ValueError:
+        tm = libtaxii.messages_10.get_message_from_xml(request.data)
+
     if tm.message_type != libtaxii.constants.MSG_DISCOVERY_REQUEST:
         return 'Invalid message, invalid Message Type', 400
 
