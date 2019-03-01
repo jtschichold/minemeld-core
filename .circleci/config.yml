@@ -1,0 +1,29 @@
+version: 2
+jobs:
+  build-bionic:
+    docker:
+      - image: circleci/buildpack-deps:bionic
+    steps:
+      - run:
+          name: Update & Upgrade
+          command: apt update && apt upgrade -y
+      - checkout
+      - run:
+          name: Install deps
+          command: >
+            sudo apt install -y gcc git python-minimal python2.7-dev
+            libffi-dev libssl-dev make g++ libleveldb-dev librrd-dev
+            libxslt1-dev libc-ares-dev libsnappy-dev libsnappy-dev
+      - run:
+          name: Upgrade PIP
+          command: sudo -H pip install --upgrade pip
+      - run:
+          name: Install Python dev requirements
+          command: sudo -H pip install --upgrade pip
+      - run:
+          command: /usr/bin/env python -V
+      - run:
+          name: Build package
+          command: >
+            platter build -r requirements-web.txt
+            --prebuild-script scripts/prebuild-script.sh
