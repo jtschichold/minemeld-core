@@ -21,6 +21,7 @@ jobs:
           name: Install Python dev requirements
           command: sudo -H pip install --upgrade pip
       - run:
+          name: Show Python Version
           command: /usr/bin/env python -V
       - run:
           name: Build package
