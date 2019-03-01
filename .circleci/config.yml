@@ -19,7 +19,7 @@ jobs:
           command: wget https://bootstrap.pypa.io/get-pip.py && sudo -H python get-pip.py
       - run:
           name: Install Python dev requirements
-          command: sudo -H pip install --upgrade pip
+          command: sudo -H pip install -r requirements-dev.txt
       - run:
           name: Show Python Version
           command: /usr/bin/env python -V
