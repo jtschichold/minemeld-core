@@ -6,7 +6,7 @@ jobs:
     steps:
       - run:
           name: Update & Upgrade
-          command: apt update && apt upgrade -y
+          command: sudo apt update && sudo apt upgrade -y
       - checkout
       - run:
           name: Install deps
