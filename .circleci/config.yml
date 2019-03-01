@@ -28,3 +28,8 @@ jobs:
           command: >
             platter build -r requirements-web.txt
             --prebuild-script scripts/prebuild-script.sh
+workflows:
+  version: 2
+  build:
+    jobs:
+      - build-bionic
