@@ -15,8 +15,8 @@ jobs:
             libffi-dev libssl-dev make g++ libleveldb-dev librrd-dev
             libxslt1-dev libc-ares-dev libsnappy-dev libsnappy-dev
       - run:
-          name: Upgrade PIP
-          command: sudo -H pip install --upgrade pip
+          name: Install PIP
+          command: wget https://bootstrap.pypa.io/get-pip.py && sudo -H python get-pip.py
       - run:
           name: Install Python dev requirements
           command: sudo -H pip install --upgrade pip
