@@ -13,7 +13,35 @@ jobs:
           command: >
             sudo apt install -y gcc git python-minimal python2.7-dev
             libffi-dev libssl-dev make g++ libleveldb-dev librrd-dev
-            libxslt1-dev libc-ares-dev libsnappy-dev libsnappy-dev
+            libxslt1-dev libc-ares-dev libsnappy-dev
+      - run:
+          name: Install PIP
+          command: wget https://bootstrap.pypa.io/get-pip.py && sudo -H python get-pip.py
+      - run:
+          name: Install Python dev requirements
+          command: sudo -H pip install -r requirements-dev.txt
+      - run:
+          name: Show Python Version
+          command: /usr/bin/env python -V
+      - run:
+          name: Build package
+          command: >
+            platter build -r requirements-web.txt
+            --prebuild-script scripts/prebuild-script.sh
+  build-xenial:
+    docker:
+      - image: circleci/buildpack-deps:xenial
+    steps:
+      - run:
+          name: Update & Upgrade
+          command: sudo apt update && sudo apt upgrade -y
+      - checkout
+      - run:
+          name: Install deps
+          command: >
+            sudo apt install -y gcc git python-minimal python2.7-dev
+            libffi-dev libssl-dev make g++ libleveldb-dev librrd-dev
+            libxslt1-dev libc-ares-dev libsnappy-dev
       - run:
           name: Install PIP
           command: wget https://bootstrap.pypa.io/get-pip.py && sudo -H python get-pip.py
@@ -33,3 +61,4 @@ workflows:
   build:
     jobs:
       - build-bionic
+      - build-xenial
