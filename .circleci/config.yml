@@ -60,7 +60,7 @@ jobs:
           root: /tmp/workspace
           paths: dist/*
 
-    deploy-xenial:
+  deploy-xenial:
     docker:
       - image: circleci/buildpack-deps:xenial
     steps:
