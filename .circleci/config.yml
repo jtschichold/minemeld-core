@@ -74,9 +74,9 @@ workflows:
     jobs:
       - build-xenial
       - deploy-xenial:
-        requires:
-          - build-xenial
-        type: approval
+          requires:
+            - build-xenial
+          type: approval
 
   bionic:
     jobs:
