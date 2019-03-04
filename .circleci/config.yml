@@ -64,6 +64,8 @@ jobs:
     docker:
       - image: circleci/buildpack-deps:xenial
     steps:
+      - attach_workspace:
+          at: /tmp/workspace
       - run:
           name: Workspace contents
           command: find /tmp/workspace
