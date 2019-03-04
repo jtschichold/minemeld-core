@@ -57,7 +57,7 @@ jobs:
             platter build -r requirements-web.txt
             --prebuild-script scripts/prebuild-script.sh
       - persist_to_workspace:
-          root: /tmp/workspace
+          root: ~/workspace
           paths: dist/*
 
   deploy-xenial:
@@ -65,10 +65,10 @@ jobs:
       - image: circleci/buildpack-deps:xenial
     steps:
       - attach_workspace:
-          at: /tmp/workspace
+          at: ~/workspace
       - run:
           name: Workspace contents
-          command: find /tmp/workspace
+          command: find ~/workspace
 
 workflows:
   version: 2
