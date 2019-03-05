@@ -60,18 +60,19 @@ jobs:
           name: List files
           command: find dist
       - persist_to_workspace:
-          root: ~/
-          paths: dist/*
+          root: ~/workspace
+          paths:
+            - dist
 
   deploy-xenial:
     docker:
       - image: circleci/buildpack-deps:xenial
     steps:
       - attach_workspace:
-          at: ~/
+          at: ~/workspace
       - run:
           name: Workspace contents
-          command: find ~/
+          command: find ~/workspace
 
 workflows:
   version: 2
