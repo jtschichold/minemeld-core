@@ -82,7 +82,9 @@ workflows:
       - deploy-xenial:
           requires:
             - build-xenial
-          type: approval
+          filters:
+            tags:
+              only: '/.*/'
 
   bionic:
     jobs:
