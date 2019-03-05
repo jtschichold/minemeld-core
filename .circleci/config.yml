@@ -1,4 +1,6 @@
-version: 2
+version: 2.1
+orbs:
+  aws-s3: circleci/aws-s3@1.0.4
 jobs:
   build-bionic:
     docker:
@@ -28,6 +30,7 @@ jobs:
           command: >
             platter build -r requirements-web.txt
             --prebuild-script scripts/prebuild-script.sh
+
   build-xenial:
     docker:
       - image: circleci/buildpack-deps:xenial
@@ -70,6 +73,9 @@ jobs:
           command: mkdir ~/workspace
       - attach_workspace:
           at: ~/workspace
+      - run:
+          name: Rename files
+          command: for file in ~/workspace; do mv "~/workspace/$file" "~/workspace/${file%.tar.gz}.xenial"; done
       - run:
           name: Workspace contents
           command: find ~/workspace
