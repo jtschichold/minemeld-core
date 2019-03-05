@@ -56,13 +56,10 @@ jobs:
           command: >
             platter build -r requirements-web.txt
             --prebuild-script scripts/prebuild-script.sh
-      - run:
-          name: Create workspace dir
-          command: mkdir ~/workspace
       - persist_to_workspace:
-          root: ~/
+          root: dist
           paths:
-            - dist
+            - .
 
   deploy-xenial:
     docker:
