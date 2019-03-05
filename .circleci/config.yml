@@ -30,6 +30,9 @@ jobs:
           command: >
             platter build -r requirements-web.txt
             --prebuild-script scripts/prebuild-script.sh
+      - run:
+          name: Rename files
+          command: for file in ~/workspace/*; do mv "$file" "${file%.tar.gz}.xenial"; done
       - persist_to_workspace:
           root: dist
           paths:
@@ -63,12 +66,15 @@ jobs:
           command: >
             platter build -r requirements-web.txt
             --prebuild-script scripts/prebuild-script.sh
+      - run:
+          name: Rename files
+          command: for file in ~/workspace/*; do mv "$file" "${file%.tar.gz}.bionic"; done
       - persist_to_workspace:
           root: dist
           paths:
             - .
 
-  deploy-xenial:
+  deploy:
     docker:
       - image: circleci/buildpack-deps:xenial
     steps:
@@ -78,18 +84,22 @@ jobs:
       - attach_workspace:
           at: ~/workspace
       - run:
-          name: Rename files
-          command: for file in ~/workspace/*; do mv "$file" "${file%.tar.gz}.xenial"; done
-      - run:
           name: Workspace contents
           command: find ~/workspace
+      - aws-s3/sync:
+          from: workspace
+          to: 's3://minemeld/'
+          arguments: |
+            --acl public-read \
+            --dry-run
+          overwrite: true
 
 workflows:
   version: 2
   xenial:
     jobs:
       - build-xenial
-      - deploy-xenial:
+      - deploy:
           requires:
             - build-xenial
           filters:
@@ -99,3 +109,9 @@ workflows:
   bionic:
     jobs:
       - build-bionic
+      - deploy:
+          requires:
+            - build-bionic
+          filters:
+            tags:
+              only: '/.*/'
