@@ -57,10 +57,10 @@ jobs:
             platter build -r requirements-web.txt
             --prebuild-script scripts/prebuild-script.sh
       - run:
-          name: List files
-          command: find dist
+          name: Create workspace dir
+          command: mkdir ~/workspace
       - persist_to_workspace:
-          root: ~/workspace
+          root: ~/
           paths:
             - dist
 
@@ -68,6 +68,9 @@ jobs:
     docker:
       - image: circleci/buildpack-deps:xenial
     steps:
+      - run:
+          name: Create workspace dir
+          command: mkdir ~/workspace
       - attach_workspace:
           at: ~/workspace
       - run:
