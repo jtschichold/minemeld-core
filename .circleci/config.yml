@@ -56,6 +56,9 @@ jobs:
           command: >
             platter build -r requirements-web.txt
             --prebuild-script scripts/prebuild-script.sh
+      - run:
+          name: List files
+          command: find dist
       - persist_to_workspace:
           root: ~/
           paths: dist/*
