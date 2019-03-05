@@ -30,6 +30,10 @@ jobs:
           command: >
             platter build -r requirements-web.txt
             --prebuild-script scripts/prebuild-script.sh
+      - persist_to_workspace:
+          root: dist
+          paths:
+            - .
 
   build-xenial:
     docker:
