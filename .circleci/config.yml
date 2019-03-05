@@ -76,7 +76,7 @@ jobs:
 
   deploy:
     docker:
-      - image: circleci/buildpack-deps:xenial
+      - image: circleci/python:2.7
     steps:
       - run:
           name: Create workspace dir
