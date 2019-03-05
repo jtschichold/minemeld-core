@@ -87,7 +87,7 @@ jobs:
           name: Workspace contents
           command: find ~/workspace
       - aws-s3/sync:
-          from: workspace
+          from: ~/workspace
           to: 's3://minemeld/'
           arguments: |
             --acl public-read \
