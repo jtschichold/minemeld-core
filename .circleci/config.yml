@@ -90,8 +90,7 @@ jobs:
           from: ~/workspace
           to: 's3://minemeld/'
           arguments: |
-            --acl public-read \
-            --dryrun
+            --acl public-read
 
 workflows:
   version: 2
