@@ -491,6 +491,45 @@ def generate_carbon_black(feed, start, num, desc, value, **kwargs):
     yield "}}]}"
 
 
+def generate_f5_csv_feed(feed, start, num, desc, value, **kwargs):
+    zrange = SR.zrange
+    if desc:
+        zrange = SR.zrevrange
+
+    if num is None:
+        num = (1 << 32) - 1
+
+    cstart = start
+
+    while cstart < (start + num):
+        ilist = zrange(feed, cstart,
+                        cstart - 1 + min(start + num - cstart, FEED_INTERVAL))
+
+        for i in ilist:
+            if '-' in i:
+                try:
+                    ip_range = IPRange(*i.split('-', 1))
+                    cidrs = [ip_range.cidrs()]
+
+                except (AddrFormatError, ValueError, TypeError):
+                    continue
+
+            else:
+                try:
+                    cidrs = [IPNetwork(i)]
+
+                except (AddrFormatError, ValueError, TypeError):
+                    continue
+
+            for cidr in cidrs:
+                yield '{},{}\n'.format(str(cidr.network), cidr.prefixlen)
+
+        if len(ilist) < 100:
+            break
+
+        cstart += 100
+
+
 _FEED_FORMATS = {
     'json': {
         'formatter': generate_json_feed,
@@ -518,6 +557,10 @@ _FEED_FORMATS = {
     },
     'csv': {
         'formatter': generate_csv_feed,
+        'mimetype': 'text/csv'
+    },
+    'f5ip': {
+        'formatter': generate_f5_csv_feed,
         'mimetype': 'text/csv'
     }
 }
