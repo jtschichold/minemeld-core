@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import print_function
+
 
 import gevent
 import gevent.monkey
@@ -281,7 +281,7 @@ def main():
             config=config.mgmtbus['master'],
             comm_class=config.mgmtbus['transport']['class'],
             comm_config=config.mgmtbus['transport']['config'],
-            nodes=config.nodes.keys(),
+            nodes=list(config.nodes.keys()),
             num_chassis=len(processes)
         )
         mbusmaster.start()

@@ -181,7 +181,7 @@ class PanForest(object):
         """return iterator of seconds to sleep until log match"""
 
         try:
-            xrange(1)
+            range(1)
         except NameError:
             _range = range
         else:

@@ -19,7 +19,7 @@ This module implements the storage mechansim for the mm-traced daemon
 import logging
 import datetime
 import time
-import Queue
+import queue
 import os
 import os.path
 
@@ -246,7 +246,7 @@ class Store(object):
 
         # garbage collect
         candidate = None
-        for _, table in self.current_tables.iteritems():
+        for _, table in self.current_tables.items():
             if table.ref_count() != 0:
                 continue
 
@@ -292,7 +292,7 @@ class Store(object):
         except IndexError:
             return
 
-        except Queue.Empty:
+        except queue.Empty:
             return
 
     def _release(self, table, ref):

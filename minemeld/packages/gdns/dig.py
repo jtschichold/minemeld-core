@@ -1,7 +1,7 @@
 # Based on resolver_ares.py from gevent
 # Copyright (c) 2011 Denis Bilenko. See LICENSE for details.
 
-from __future__ import absolute_import
+
 import os
 from _socket import gaierror
 from gevent.hub import Waiter, get_hub
@@ -106,7 +106,7 @@ class Dig(object):
         self.fork_watcher.stop()
 
     def query(self, name, dnsclass, type_):
-        if isinstance(name, unicode):
+        if isinstance(name, str):
             name = name.encode('ascii')
         elif not isinstance(name, str):
             raise TypeError('Expected string, not %s' % type(name).__name__)
