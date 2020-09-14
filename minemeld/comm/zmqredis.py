@@ -19,7 +19,7 @@
 This module implements ZMQ and Redis communication class for mgmtbus and fabric.
 """
 
-from __future__ import absolute_import
+
 
 import logging
 import uuid
@@ -801,7 +801,7 @@ class ZMQRedis(object):
 
     def stop(self):
         # kill ioloops
-        for j in xrange(len(self.ioloops)):
+        for j in range(len(self.ioloops)):
             self.ioloops[j].unlink(self._ioloop_failure)
             self.ioloops[j].kill()
             self.ioloops[j] = None

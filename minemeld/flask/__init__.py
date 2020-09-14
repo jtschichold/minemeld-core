@@ -26,7 +26,7 @@ REDIS_URL = os.environ.get('REDIS_URL', 'unix:///var/run/redis/redis.sock')
 
 def create_app():
     yaml.SafeLoader.add_constructor(
-        u'tag:yaml.org,2002:timestamp',
+        'tag:yaml.org,2002:timestamp',
         yaml.SafeLoader.construct_yaml_str
     )
 
@@ -104,7 +104,7 @@ def create_app():
     app.register_blueprint(jobsapi.BLUEPRINT)
 
     # install blueprints from extensions
-    for apiname, apimmep in minemeld.loader.map(minemeld.loader.MM_API_ENTRYPOINT).iteritems():
+    for apiname, apimmep in minemeld.loader.map(minemeld.loader.MM_API_ENTRYPOINT).items():
         LOG.info('Loading blueprint from {}'.format(apiname))
         if not apimmep.loadable:
             LOG.info('API entrypoint {} not loadable, ignored'.format(apiname))
@@ -118,7 +118,7 @@ def create_app():
             LOG.exception('Error loading API entry point {}'.format(apiname))
 
     # install webui blueprints from extensions
-    for webuiname, webuimmep in minemeld.loader.map(minemeld.loader.MM_WEBUI_ENTRYPOINT).iteritems():
+    for webuiname, webuimmep in minemeld.loader.map(minemeld.loader.MM_WEBUI_ENTRYPOINT).items():
         LOG.info('Loading blueprint from {}'.format(webuiname))
         if not webuimmep.loadable:
             LOG.info('API entrypoint {} not loadable, ignored'.format(webuiname))

@@ -77,8 +77,8 @@ def _read_metadata(metadata_str):
 def _read_entry_points(ep_contents):
     ep_map = EntryPoint.parse_map(ep_contents)
 
-    for _, epgroup in ep_map.iteritems():
-        for epname, ep in epgroup.iteritems():
+    for _, epgroup in ep_map.items():
+        for epname, ep in epgroup.items():
             epgroup[epname] = str(ep)
 
     return ep_map
@@ -97,7 +97,7 @@ def _activated_extensions():
     activated_extensions = {}
 
     for epgroup in epgroups:
-        for _, epvalue in minemeld.loader.map(epgroup).iteritems():
+        for _, epvalue in minemeld.loader.map(epgroup).items():
             if epvalue.ep.dist.project_name == 'minemeld-core':
                 continue
 
@@ -256,7 +256,7 @@ def installed_extensions(installation_dir):
                 _installed_extensions.append(installed_extension)
 
             except (ValueError, IOError, KeyError, OSError) as excpt:
-                LOG.error(u'Error extracting metadata from {}: {}'.format(e, str(excpt)))
+                LOG.error('Error extracting metadata from {}: {}'.format(e, str(excpt)))
 
         # check if it is a directory
         elif os.path.isdir(epath):
@@ -268,7 +268,7 @@ def installed_extensions(installation_dir):
                 _installed_extensions.append(installed_extension)
 
             except (IOError, OSError, KeyError) as excpt:
-                LOG.error(u'Error extracting metadata from {}: {}'.format(e, str(excpt)))
+                LOG.error('Error extracting metadata from {}: {}'.format(e, str(excpt)))
 
     return _installed_extensions
 

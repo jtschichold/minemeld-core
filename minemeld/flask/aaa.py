@@ -188,7 +188,7 @@ class MMAnonynmousUser(object):
 
 class MMAuthenticatedUser(object):
     def __init__(self, _id=None):
-        self._id = unicode(_id)
+        self._id = str(_id)
 
     def get_id(self):
         return self._id
@@ -205,14 +205,14 @@ class MMAuthenticatedUser(object):
 
 class MMAuthenticatedAdminUser(MMAuthenticatedUser):
     def __init__(self, _id):
-        super(MMAuthenticatedAdminUser, self).__init__(_id=u'admin/{}'.format(_id))
+        super(MMAuthenticatedAdminUser, self).__init__(_id='admin/{}'.format(_id))
 
     def is_read_write(self):
         read_write = config.get('READ_WRITE', None)
         if read_write is None:
             return True
 
-        if isinstance(read_write, str) or isinstance(read_write, unicode):
+        if isinstance(read_write, str) or isinstance(read_write, str):
             read_write = read_write.split(',')
         elif not isinstance(read_write, list):
             LOG.error('Unknown READ_WRITE format')
@@ -229,7 +229,7 @@ class MMAuthenticatedAdminUser(MMAuthenticatedUser):
 
 class MMAuthenticatedFeedUser(MMAuthenticatedUser):
     def __init__(self, _id):
-        super(MMAuthenticatedFeedUser, self).__init__(_id=u'feeds/{}'.format(_id))
+        super(MMAuthenticatedFeedUser, self).__init__(_id='feeds/{}'.format(_id))
 
     def is_read_write(self):
         # this should never be called

@@ -88,7 +88,7 @@ class EventsReceiver(object):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         result = next(self._iterator)
 
         return result

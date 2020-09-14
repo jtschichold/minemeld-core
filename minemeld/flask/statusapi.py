@@ -80,7 +80,7 @@ class _PubSubWrapper(object):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         return next(self.generator)
 
     def close(self):
@@ -150,7 +150,7 @@ def get_minemeld_status():
         return jsonify(error={'message': status.get('error', 'error')}), 400
 
     result = []
-    for f, v in tr.iteritems():
+    for f, v in tr.items():
         _, _, v['name'] = f.split(':', 2)
         result.append(v)
 
@@ -266,7 +266,7 @@ def generate_local_backup():
     args.append(config_path)
 
     jobs = JOBS_MANAGER.get_jobs(job_group='status-backup')
-    for jobid, jobdata in jobs.iteritems():
+    for jobid, jobdata in jobs.items():
         if jobdata == 'RUNNING':
             return jsonify(error={'message': 'a backup job is already running'}), 400
 
@@ -311,7 +311,7 @@ def import_local_backup():
         with ZipFile(tf.name, 'r') as zf:
             contents = zf.namelist()
 
-    except Exception, e:
+    except Exception as e:
         safe_remove(tf.name)
         raise e
 
@@ -391,13 +391,13 @@ def restore_local_backup(backup_id):
     enable_prevent_write(locker)
     try:
         jobs = JOBS_MANAGER.get_jobs(job_group='status-backup')
-        for jobid, jobdata in jobs.iteritems():
+        for jobid, jobdata in jobs.items():
             if jobdata == 'RUNNING':
                 disable_prevent_write(locker)
                 return jsonify(error={'message': 'a backup job is running'}), 400
 
         jobs = JOBS_MANAGER.get_jobs(job_group='restore-backup')
-        for jobid, jobdata in jobs.iteritems():
+        for jobid, jobdata in jobs.items():
             if jobdata == 'RUNNING':
                 disable_prevent_write(locker)
                 return jsonify(error={'message': 'a restore job is running'}), 400
