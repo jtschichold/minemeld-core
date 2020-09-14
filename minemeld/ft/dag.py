@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import absolute_import
+
 
 import logging
 import yaml
@@ -160,10 +160,7 @@ class DevicePusher(gevent.Greenlet):
         result = []
 
         def _tag(t, v):
-            if type(v) == unicode:
-                v = v.encode('ascii', 'replace')
-            else:
-                v = str(v)
+            v = v.encode('ascii', 'replace').decode()
 
             v = SUBRE.sub('_', v)
             tag = '%s%s_%s' % (self.prefix, t, v)
@@ -253,7 +250,7 @@ class DevicePusher(gevent.Greenlet):
             ctags.pop(a)
 
         # ips not in firewall
-        for a, atags in ctags.iteritems():
+        for a, atags in ctags.items():
             register[a] = atags
 
         LOG.debug('register %s', register)
@@ -262,7 +259,7 @@ class DevicePusher(gevent.Greenlet):
         # XXX use constant for chunk size
         if len(register) != 0:
             addrs = iter(register)
-            for i in xrange(0, len(register), 1000):
+            for i in range(0, len(register), 1000):
                 rmsg = self._dag_message(
                     'register',
                     {k: register[k] for k in itertools.islice(addrs, 1000)}
@@ -271,7 +268,7 @@ class DevicePusher(gevent.Greenlet):
 
         if len(unregister) != 0:
             addrs = iter(unregister)
-            for i in xrange(0, len(unregister), 1000):
+            for i in range(0, len(unregister), 1000):
                 urmsg = self._dag_message(
                     'unregister',
                     {k: unregister[k] for k in itertools.islice(addrs, 1000)}

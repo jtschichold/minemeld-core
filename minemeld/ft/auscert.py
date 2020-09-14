@@ -89,7 +89,7 @@ class MaliciousURLFeed(http.HttpFT):
 
         result = r.iter_lines()
         if self.ignore_regex is not None:
-            result = itertools.ifilter(
+            result = filter(
                 lambda x: self.ignore_regex.match(x) is None,
                 result
             )

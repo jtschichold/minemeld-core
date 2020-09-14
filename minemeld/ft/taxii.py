@@ -12,11 +12,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import absolute_import
+
 
 import logging
 import copy
-import urlparse
+import urllib.parse
 import uuid
 import os.path
 from datetime import datetime, timedelta
@@ -219,7 +219,7 @@ class TaxiiClient(basepoller.BasePollerFT):
     def _build_taxii_client(self):
         result = libtaxii.clients.HttpClient()
 
-        up = urlparse.urlparse(self.discovery_service)
+        up = urllib.parse.urlparse(self.discovery_service)
 
         if up.scheme == 'https':
             result.set_use_https(True)
@@ -269,7 +269,7 @@ class TaxiiClient(basepoller.BasePollerFT):
         return result
 
     def _call_taxii_service(self, service_url, tc, request):
-        up = urlparse.urlparse(service_url)
+        up = urllib.parse.urlparse(service_url)
         hostname = up.hostname
         path = up.path
         port = up.port
@@ -473,12 +473,12 @@ class TaxiiClient(basepoller.BasePollerFT):
             LOG.info('{} - TAXII Content contains observables but no indicators'.format(self.name))
             if self.create_fake_indicator:
                 stix_objects['indicators']['minemeld:00000000-0000-0000-0000-000000000000'] = {
-                    'observables': stix_objects['observables'].values(),
+                    'observables': list(stix_objects['observables'].values()),
                     'ttps': []
                 }
 
         return [[iid, iv, params]
-                for iid, iv in stix_objects['indicators'].iteritems()]
+                for iid, iv in stix_objects['indicators'].items()]
 
     def _incremental_poll_collection(self, taxii_client, begin, end):
         cbegin = begin
@@ -719,7 +719,7 @@ class TaxiiClient(basepoller.BasePollerFT):
                 ov = indicator_hashes[indicator_type]
                 result['type'] = indicator_type
 
-            for h, v in indicator_hashes.iteritems():
+            for h, v in indicator_hashes.items():
                 if h == indicator_type:
                     continue
                 result['{}_{}'.format(self.prefix, h)] = v
@@ -1230,7 +1230,7 @@ def _stix_ip_observable(namespace, indicator, value):
             # use netaddr builtin algo to summarize range into CIDR
             iprange = netaddr.IPRange(a1, a2)
             cidrs = iprange.cidrs()
-            indicators = map(str, cidrs)
+            indicators = list(map(str, cidrs))
 
     observables = []
     for i in indicators:

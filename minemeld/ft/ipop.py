@@ -226,10 +226,7 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
 
     def _range_from_indicator(self, indicator):
         if '-' in indicator:
-            start, end = map(
-                lambda x: int(netaddr.IPAddress(x)),
-                indicator.split('-', 1)
-            )
+            start, end = [int(netaddr.IPAddress(x)) for x in indicator.split('-', 1)]
         elif '/' in indicator:
             ipnet = netaddr.IPNetwork(indicator)
             start = int(ipnet.ip)
@@ -433,7 +430,7 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
             )
 
     def get(self, source=None, indicator=None):
-        if not type(indicator) in [str, unicode]:
+        if not isinstance(indicator, str):
             raise ValueError("Invalid indicator type")
 
         indicator = int(netaddr.IPAddress(indicator))

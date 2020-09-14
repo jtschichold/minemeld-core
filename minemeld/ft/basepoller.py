@@ -133,7 +133,7 @@ class _BPTable_v1(_BaseBPTable):
         if itype is None:
             raise RuntimeError('Type None in table with type in key')
 
-        return u'{}::{}'.format(itype, indicator)
+        return '{}::{}'.format(itype, indicator)
 
     def _type_key_indicator(self, key):
         return key.split('::', 1)[1]
@@ -343,7 +343,7 @@ class BasePollerFT(base.BaseFT):
                 default_base=self._DEFAULT_AGE_OUT_BASE
             )
         }
-        for k, v in _age_out.iteritems():
+        for k, v in _age_out.items():
             if k in self.age_out:
                 continue
             self.age_out[k] = parse_age_out(v)
@@ -507,7 +507,7 @@ class BasePollerFT(base.BaseFT):
 
     def _compare_attributes(self, oa, na):
         default_attrs = ['sources', 'last_seen', 'first_seen']
-        default_attrs.extend(self.attributes.keys())
+        default_attrs.extend(list(self.attributes.keys()))
 
         for k in oa:
             if k in default_attrs or k[0] in ('_', '$'):
@@ -520,7 +520,7 @@ class BasePollerFT(base.BaseFT):
         return True
 
     def _update_attributes(self, current, _new, current_run, new_run):
-        x = {k:v for k,v in current.iteritems() 
+        x = {k:v for k,v in current.items() 
              if k in _new or
                 k in self.attributes or
                 k in ['sources', 'last_seen', 'first_seen'] or
@@ -711,7 +711,7 @@ class BasePollerFT(base.BaseFT):
 
         if aggregation_exc is not None:
             LOG.info('{} - Reraising exception happened during aggregation'.format(self.name))
-            raise aggregation_exc[0], aggregation_exc[1], aggregation_exc[2]
+            raise aggregation_exc[0](aggregation_exc[1]).with_traceback(aggregation_exc[2])
 
         return True
 

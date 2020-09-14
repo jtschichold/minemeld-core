@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import absolute_import
+
 
 import logging
 import shutil
@@ -108,7 +108,7 @@ class SyslogMatcher(actorbase.ActorBaseFT):
             return
 
         if type_ == 'IPv4':
-            start, end = map(netaddr.IPAddress, indicator.split('-', 1))
+            start, end = list(map(netaddr.IPAddress, indicator.split('-', 1)))
 
             LOG.debug('start: %d', start.value)
 
@@ -401,7 +401,7 @@ class SyslogMiner(base.BaseFT):
             'interval': _age_out.get('interval', 3600),
             'default': parse_age_out(_age_out.get('default', 'last_seen+1h'))
         }
-        for k, v in _age_out.iteritems():
+        for k, v in _age_out.items():
             if k in self.age_out:
                 continue
             self.age_out[k] = parse_age_out(v)
@@ -709,7 +709,7 @@ class SyslogMiner(base.BaseFT):
 
     def _amqp_callback(self, msg):
         try:
-            LOG.info(u'{}'.format(msg.body))
+            LOG.info('{}'.format(msg.body))
             message = ujson.loads(msg.body)
             self._msg_queue.put(message)
             self._do_process.set()

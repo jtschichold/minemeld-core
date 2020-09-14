@@ -110,8 +110,7 @@ class Intelligence(basepoller.BasePollerFT):
             return [[None, None]]
 
         indicator = item['value']
-        if not (isinstance(indicator, str) or
-                isinstance(indicator, unicode)):
+        if not (isinstance(indicator, str):
             LOG.error(
                 '%s - Wrong indicator type: %s - %s',
                 self.name, indicator, type(indicator)
@@ -120,7 +119,7 @@ class Intelligence(basepoller.BasePollerFT):
 
         fields = self.fields
         if fields is None:
-            fields = item.keys()
+            fields = list(item.keys())
             fields.remove('value')
 
         attributes = {}

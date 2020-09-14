@@ -21,7 +21,7 @@ import requests
 import re
 
 from . import json
-from utils import utc_millisec, dt_to_millisec
+from .utils import utc_millisec, dt_to_millisec
 from datetime import datetime
 from netaddr import IPNetwork, AddrFormatError
 
@@ -62,8 +62,7 @@ class VTI(json.SimpleJSON):
             return [[None, None]]
 
         indicator = item[self.indicator]
-        if not (isinstance(indicator, str) or
-                isinstance(indicator, unicode)):
+        if not isinstance(indicator, str):
             LOG.error(
                 'Wrong indicator type: %s - %s',
                 indicator, type(indicator)
@@ -92,7 +91,7 @@ class VTI(json.SimpleJSON):
 
         fields = self.fields
         if fields is None:
-            fields = item.keys()
+            fields = list(item.keys())
             fields.remove(self.indicator)
 
         if 'indicatorType' in fields:
@@ -181,7 +180,7 @@ class VTI(json.SimpleJSON):
         return None
 
     def _detect_sha_version(self, hash_value):
-        for hash_type, re_obj in self.hash_patterns.iteritems():
+        for hash_type, re_obj in self.hash_patterns.items():
             if re_obj.match(hash_value) is not None:
                 return hash_type
         return None

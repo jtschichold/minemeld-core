@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import absolute_import
+
 
 import logging
 import itertools
@@ -127,11 +127,11 @@ class GoogleSPF(basepoller.BasePollerFT):
         for idomain in mainspf['include']:
             ispf = self._resolve_spf(dig, idomain)
 
-            _iterators.append(itertools.imap(
+            _iterators.append(map(
                 functools.partial(self._build_IPv4, idomain),
                 ispf.get('ip4', [])
             ))
-            _iterators.append(itertools.imap(
+            _iterators.append(map(
                 functools.partial(self._build_IPv6, idomain),
                 ispf.get('ip6', [])
             ))

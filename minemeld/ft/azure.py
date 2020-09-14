@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import absolute_import
+
 
 import logging
 import itertools
@@ -165,7 +165,7 @@ class AzureXML(basepoller.BasePollerFT):
             LOG.debug('%s - Extracting region: %s', self.name, r.get('Name'))
 
             ipranges = r.xpath('IpRange')
-            _iterators.append(itertools.imap(
+            _iterators.append(map(
                 functools.partial(_build_IPv4, self.name, r.get('Name')),
                 ipranges
             ))
@@ -254,7 +254,7 @@ class AzureJSON(basepoller.BasePollerFT):
             platform = props.get('platform', None)
             system_service = props.get('systemService', None)
             address_prefixes = props.get('addressPrefixes', [])
-            _iterators.append(itertools.imap(
+            _iterators.append(map(
                 functools.partial(
                     _build_IP,
                     self.name,
@@ -279,7 +279,7 @@ class AzureJSON(basepoller.BasePollerFT):
             cv = aggregated_indicators[i['indicator']]
             cv.update(i)
 
-            for k, v in i.iteritems():
+            for k, v in i.items():
                 cv[k] = v
                 if k.startswith('azure_'):
                     cv['{}_list'.format(k)].add(str(v).lower())
@@ -290,4 +290,4 @@ class AzureJSON(basepoller.BasePollerFT):
                 if isinstance(iv[k], set):
                     iv[k] = list(iv[k])
 
-        return iter(aggregated_indicators.values())
+        return iter(list(aggregated_indicators.values()))

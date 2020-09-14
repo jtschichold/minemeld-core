@@ -347,7 +347,7 @@ class Intelligence(basepoller.BasePollerFT):
 
             thgen = self._retrieve_threats(
                 self._group_changes_in_pages(
-                    itertools.ifilter(self._filter_changes, changelog)
+                    filter(self._filter_changes, changelog)
                 )
             )
             for t in thgen:

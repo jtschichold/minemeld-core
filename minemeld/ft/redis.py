@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import absolute_import
+
 
 import logging
 import redis
@@ -177,7 +177,7 @@ class RedisSet(actorbase.ActorBaseFT):
         score = 0
         if self.scoring_attribute is not None:
             av = value.get(self.scoring_attribute, None)
-            if type(av) == int or type(av) == long:
+            if type(av) == int:
                 score = av
             else:
                 LOG.error("scoring_attribute is not int: %s", type(av))

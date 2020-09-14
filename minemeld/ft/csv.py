@@ -17,7 +17,7 @@ This module implements minemeld.ft.csv.CSVFT, the Miner node for csv
 feeds over HTTP/HTTPS.
 """
 
-from __future__ import absolute_import
+
 
 import logging
 import re
@@ -178,7 +178,7 @@ class CSVFT(basepoller.BasePollerFT):
             response = self._gzipped_line_splitter(r)
 
         if self.ignore_regex is not None:
-            response = itertools.ifilter(
+            response = filter(
                 lambda x: self.ignore_regex.match(x) is None,
                 response
             )
@@ -196,7 +196,7 @@ class CSVFT(basepoller.BasePollerFT):
         pending = None
 
         decoder = GzipDecoder()
-        chunks = itertools.imap(
+        chunks = map(
             decoder.decompress,
             response.iter_content(chunk_size=1024*1024)
         )

@@ -1,32 +1,30 @@
-# Generated from BoolExpr.g4 by ANTLR 4.7.1
+# Generated from /Users/lmori/Documents/minemeld/minemeld-core/minemeld/ft/condition/BoolExpr.g4 by ANTLR 4.6
 # encoding: utf-8
-from __future__ import print_function
 from antlr4 import *
 from io import StringIO
-import sys
 
 
 # flake8: noqa
 
 def serializedATN():
     with StringIO() as buf:
-        buf.write(u"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3")
-        buf.write(u"\22\63\4\2\t\2\4\3\t\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t")
-        buf.write(u"\7\4\b\t\b\3\2\3\2\3\2\3\2\3\3\3\3\5\3\27\n\3\3\4\3\4")
-        buf.write(u"\3\4\5\4\34\n\4\3\5\3\5\3\5\3\6\3\6\3\6\3\6\3\6\5\6&")
-        buf.write(u"\n\6\7\6(\n\6\f\6\16\6+\13\6\3\6\3\6\3\7\3\7\3\b\3\b")
-        buf.write(u"\3\b\2\2\t\2\4\6\b\n\f\16\2\4\3\2\6\13\4\2\f\16\20\21")
-        buf.write(u"\2/\2\20\3\2\2\2\4\26\3\2\2\2\6\30\3\2\2\2\b\35\3\2\2")
-        buf.write(u"\2\n \3\2\2\2\f.\3\2\2\2\16\60\3\2\2\2\20\21\5\4\3\2")
-        buf.write(u"\21\22\5\f\7\2\22\23\5\16\b\2\23\3\3\2\2\2\24\27\7\17")
-        buf.write(u"\2\2\25\27\5\6\4\2\26\24\3\2\2\2\26\25\3\2\2\2\27\5\3")
-        buf.write(u"\2\2\2\30\33\7\17\2\2\31\34\5\b\5\2\32\34\5\n\6\2\33")
-        buf.write(u"\31\3\2\2\2\33\32\3\2\2\2\34\7\3\2\2\2\35\36\7\3\2\2")
-        buf.write(u"\36\37\7\4\2\2\37\t\3\2\2\2 !\7\3\2\2!)\5\4\3\2\"%\7")
-        buf.write(u"\5\2\2#&\5\4\3\2$&\5\16\b\2%#\3\2\2\2%$\3\2\2\2&(\3\2")
-        buf.write(u"\2\2\'\"\3\2\2\2(+\3\2\2\2)\'\3\2\2\2)*\3\2\2\2*,\3\2")
-        buf.write(u"\2\2+)\3\2\2\2,-\7\4\2\2-\13\3\2\2\2./\t\2\2\2/\r\3\2")
-        buf.write(u"\2\2\60\61\t\3\2\2\61\17\3\2\2\2\6\26\33%)")
+        buf.write("\3\u0430\ud6d1\u8206\uad2d\u4417\uaef1\u8d80\uaadd\3\22")
+        buf.write("\63\4\2\t\2\4\3\t\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t\7\4")
+        buf.write("\b\t\b\3\2\3\2\3\2\3\2\3\3\3\3\5\3\27\n\3\3\4\3\4\3\4")
+        buf.write("\5\4\34\n\4\3\5\3\5\3\5\3\6\3\6\3\6\3\6\3\6\5\6&\n\6\7")
+        buf.write("\6(\n\6\f\6\16\6+\13\6\3\6\3\6\3\7\3\7\3\b\3\b\3\b\2\2")
+        buf.write("\t\2\4\6\b\n\f\16\2\4\3\2\6\13\4\2\f\16\20\21/\2\20\3")
+        buf.write("\2\2\2\4\26\3\2\2\2\6\30\3\2\2\2\b\35\3\2\2\2\n \3\2\2")
+        buf.write("\2\f.\3\2\2\2\16\60\3\2\2\2\20\21\5\4\3\2\21\22\5\f\7")
+        buf.write("\2\22\23\5\16\b\2\23\3\3\2\2\2\24\27\7\17\2\2\25\27\5")
+        buf.write("\6\4\2\26\24\3\2\2\2\26\25\3\2\2\2\27\5\3\2\2\2\30\33")
+        buf.write("\7\17\2\2\31\34\5\b\5\2\32\34\5\n\6\2\33\31\3\2\2\2\33")
+        buf.write("\32\3\2\2\2\34\7\3\2\2\2\35\36\7\3\2\2\36\37\7\4\2\2\37")
+        buf.write("\t\3\2\2\2 !\7\3\2\2!)\5\4\3\2\"%\7\5\2\2#&\5\4\3\2$&")
+        buf.write("\5\16\b\2%#\3\2\2\2%$\3\2\2\2&(\3\2\2\2\'\"\3\2\2\2(+")
+        buf.write("\3\2\2\2)\'\3\2\2\2)*\3\2\2\2*,\3\2\2\2+)\3\2\2\2,-\7")
+        buf.write("\4\2\2-\13\3\2\2\2./\t\2\2\2/\r\3\2\2\2\60\61\t\3\2\2")
+        buf.write("\61\17\3\2\2\2\6\26\33%)")
         return buf.getvalue()
 
 
@@ -40,15 +38,14 @@ class BoolExprParser ( Parser ):
 
     sharedContextCache = PredictionContextCache()
 
-    literalNames = [ u"<INVALID>", u"'('", u"')'", u"','", u"'<'", u"'<='", 
-                     u"'=='", u"'>='", u"'>'", u"'!='", u"'true'", u"'false'", 
-                     u"'null'" ]
+    literalNames = [ "<INVALID>", "'('", "')'", "','", "'<'", "'<='", "'=='", 
+                     "'>='", "'>'", "'!='", "'true'", "'false'", "'null'" ]
 
-    symbolicNames = [ u"<INVALID>", u"<INVALID>", u"<INVALID>", u"<INVALID>", 
-                      u"<INVALID>", u"<INVALID>", u"<INVALID>", u"<INVALID>", 
-                      u"<INVALID>", u"<INVALID>", u"<INVALID>", u"<INVALID>", 
-                      u"<INVALID>", u"JAVASCRIPTIDENTIFIER", u"STRING", 
-                      u"NUMBER", u"WS" ]
+    symbolicNames = [ "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
+                      "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
+                      "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
+                      "<INVALID>", "JAVASCRIPTIDENTIFIER", "STRING", "NUMBER", 
+                      "WS" ]
 
     RULE_booleanExpression = 0
     RULE_expression = 1
@@ -58,8 +55,8 @@ class BoolExprParser ( Parser ):
     RULE_comparator = 5
     RULE_value = 6
 
-    ruleNames =  [ u"booleanExpression", u"expression", u"functionExpression", 
-                   u"noArgs", u"oneOrMoreArgs", u"comparator", u"value" ]
+    ruleNames =  [ "booleanExpression", "expression", "functionExpression", 
+                   "noArgs", "oneOrMoreArgs", "comparator", "value" ]
 
     EOF = Token.EOF
     T__0=1
@@ -79,9 +76,9 @@ class BoolExprParser ( Parser ):
     NUMBER=15
     WS=16
 
-    def __init__(self, input, output=sys.stdout):
-        super(BoolExprParser, self).__init__(input, output=output)
-        self.checkVersion("4.7.1")
+    def __init__(self, input:TokenStream):
+        super().__init__(input)
+        self.checkVersion("4.6")
         self._interp = ParserATNSimulator(self, self.atn, self.decisionsToDFA, self.sharedContextCache)
         self._predicates = None
 
@@ -89,8 +86,8 @@ class BoolExprParser ( Parser ):
 
     class BooleanExpressionContext(ParserRuleContext):
 
-        def __init__(self, parser, parent=None, invokingState=-1):
-            super(BoolExprParser.BooleanExpressionContext, self).__init__(parent, invokingState)
+        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+            super().__init__(parent, invokingState)
             self.parser = parser
 
         def expression(self):
@@ -108,12 +105,12 @@ class BoolExprParser ( Parser ):
         def getRuleIndex(self):
             return BoolExprParser.RULE_booleanExpression
 
-        def enterRule(self, listener):
-            if hasattr(listener, "enterBooleanExpression"):
+        def enterRule(self, listener:ParseTreeListener):
+            if hasattr( listener, "enterBooleanExpression" ):
                 listener.enterBooleanExpression(self)
 
-        def exitRule(self, listener):
-            if hasattr(listener, "exitBooleanExpression"):
+        def exitRule(self, listener:ParseTreeListener):
+            if hasattr( listener, "exitBooleanExpression" ):
                 listener.exitBooleanExpression(self)
 
 
@@ -141,8 +138,8 @@ class BoolExprParser ( Parser ):
 
     class ExpressionContext(ParserRuleContext):
 
-        def __init__(self, parser, parent=None, invokingState=-1):
-            super(BoolExprParser.ExpressionContext, self).__init__(parent, invokingState)
+        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+            super().__init__(parent, invokingState)
             self.parser = parser
 
         def JAVASCRIPTIDENTIFIER(self):
@@ -155,12 +152,12 @@ class BoolExprParser ( Parser ):
         def getRuleIndex(self):
             return BoolExprParser.RULE_expression
 
-        def enterRule(self, listener):
-            if hasattr(listener, "enterExpression"):
+        def enterRule(self, listener:ParseTreeListener):
+            if hasattr( listener, "enterExpression" ):
                 listener.enterExpression(self)
 
-        def exitRule(self, listener):
-            if hasattr(listener, "exitExpression"):
+        def exitRule(self, listener:ParseTreeListener):
+            if hasattr( listener, "exitExpression" ):
                 listener.exitExpression(self)
 
 
@@ -197,8 +194,8 @@ class BoolExprParser ( Parser ):
 
     class FunctionExpressionContext(ParserRuleContext):
 
-        def __init__(self, parser, parent=None, invokingState=-1):
-            super(BoolExprParser.FunctionExpressionContext, self).__init__(parent, invokingState)
+        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+            super().__init__(parent, invokingState)
             self.parser = parser
 
         def JAVASCRIPTIDENTIFIER(self):
@@ -215,12 +212,12 @@ class BoolExprParser ( Parser ):
         def getRuleIndex(self):
             return BoolExprParser.RULE_functionExpression
 
-        def enterRule(self, listener):
-            if hasattr(listener, "enterFunctionExpression"):
+        def enterRule(self, listener:ParseTreeListener):
+            if hasattr( listener, "enterFunctionExpression" ):
                 listener.enterFunctionExpression(self)
 
-        def exitRule(self, listener):
-            if hasattr(listener, "exitFunctionExpression"):
+        def exitRule(self, listener:ParseTreeListener):
+            if hasattr( listener, "exitFunctionExpression" ):
                 listener.exitFunctionExpression(self)
 
 
@@ -258,20 +255,20 @@ class BoolExprParser ( Parser ):
 
     class NoArgsContext(ParserRuleContext):
 
-        def __init__(self, parser, parent=None, invokingState=-1):
-            super(BoolExprParser.NoArgsContext, self).__init__(parent, invokingState)
+        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+            super().__init__(parent, invokingState)
             self.parser = parser
 
 
         def getRuleIndex(self):
             return BoolExprParser.RULE_noArgs
 
-        def enterRule(self, listener):
-            if hasattr(listener, "enterNoArgs"):
+        def enterRule(self, listener:ParseTreeListener):
+            if hasattr( listener, "enterNoArgs" ):
                 listener.enterNoArgs(self)
 
-        def exitRule(self, listener):
-            if hasattr(listener, "exitNoArgs"):
+        def exitRule(self, listener:ParseTreeListener):
+            if hasattr( listener, "exitNoArgs" ):
                 listener.exitNoArgs(self)
 
 
@@ -297,18 +294,18 @@ class BoolExprParser ( Parser ):
 
     class OneOrMoreArgsContext(ParserRuleContext):
 
-        def __init__(self, parser, parent=None, invokingState=-1):
-            super(BoolExprParser.OneOrMoreArgsContext, self).__init__(parent, invokingState)
+        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+            super().__init__(parent, invokingState)
             self.parser = parser
 
-        def expression(self, i=None):
+        def expression(self, i:int=None):
             if i is None:
                 return self.getTypedRuleContexts(BoolExprParser.ExpressionContext)
             else:
                 return self.getTypedRuleContext(BoolExprParser.ExpressionContext,i)
 
 
-        def value(self, i=None):
+        def value(self, i:int=None):
             if i is None:
                 return self.getTypedRuleContexts(BoolExprParser.ValueContext)
             else:
@@ -318,12 +315,12 @@ class BoolExprParser ( Parser ):
         def getRuleIndex(self):
             return BoolExprParser.RULE_oneOrMoreArgs
 
-        def enterRule(self, listener):
-            if hasattr(listener, "enterOneOrMoreArgs"):
+        def enterRule(self, listener:ParseTreeListener):
+            if hasattr( listener, "enterOneOrMoreArgs" ):
                 listener.enterOneOrMoreArgs(self)
 
-        def exitRule(self, listener):
-            if hasattr(listener, "exitOneOrMoreArgs"):
+        def exitRule(self, listener:ParseTreeListener):
+            if hasattr( listener, "exitOneOrMoreArgs" ):
                 listener.exitOneOrMoreArgs(self)
 
 
@@ -376,20 +373,20 @@ class BoolExprParser ( Parser ):
 
     class ComparatorContext(ParserRuleContext):
 
-        def __init__(self, parser, parent=None, invokingState=-1):
-            super(BoolExprParser.ComparatorContext, self).__init__(parent, invokingState)
+        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+            super().__init__(parent, invokingState)
             self.parser = parser
 
 
         def getRuleIndex(self):
             return BoolExprParser.RULE_comparator
 
-        def enterRule(self, listener):
-            if hasattr(listener, "enterComparator"):
+        def enterRule(self, listener:ParseTreeListener):
+            if hasattr( listener, "enterComparator" ):
                 listener.enterComparator(self)
 
-        def exitRule(self, listener):
-            if hasattr(listener, "exitComparator"):
+        def exitRule(self, listener:ParseTreeListener):
+            if hasattr( listener, "exitComparator" ):
                 listener.exitComparator(self)
 
 
@@ -419,8 +416,8 @@ class BoolExprParser ( Parser ):
 
     class ValueContext(ParserRuleContext):
 
-        def __init__(self, parser, parent=None, invokingState=-1):
-            super(BoolExprParser.ValueContext, self).__init__(parent, invokingState)
+        def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
+            super().__init__(parent, invokingState)
             self.parser = parser
 
         def STRING(self):
@@ -432,12 +429,12 @@ class BoolExprParser ( Parser ):
         def getRuleIndex(self):
             return BoolExprParser.RULE_value
 
-        def enterRule(self, listener):
-            if hasattr(listener, "enterValue"):
+        def enterRule(self, listener:ParseTreeListener):
+            if hasattr( listener, "enterValue" ):
                 listener.enterValue(self)
 
-        def exitRule(self, listener):
-            if hasattr(listener, "exitValue"):
+        def exitRule(self, listener:ParseTreeListener):
+            if hasattr( listener, "exitValue" ):
                 listener.exitValue(self)
 
 

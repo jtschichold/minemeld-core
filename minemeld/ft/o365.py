@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import absolute_import
+
 
 import logging
 import itertools
@@ -146,7 +146,7 @@ class O365XML(basepoller.BasePollerFT):
                 xpath + "/addresslist[@type='IPv4']/address",
                 namespaces=self.prefixmap
             )
-            _iterators.append(itertools.imap(
+            _iterators.append(map(
                 functools.partial(_build_IPv4, 'office365.%s' % p.lower()),
                 pIPv4s
             ))
@@ -155,7 +155,7 @@ class O365XML(basepoller.BasePollerFT):
                 xpath + "/addresslist[@type='IPv6']/address",
                 namespaces=self.prefixmap
             )
-            _iterators.append(itertools.imap(
+            _iterators.append(map(
                 functools.partial(_build_IPv6, 'office365.%s' % p.lower()),
                 pIPv6s
             ))
@@ -164,7 +164,7 @@ class O365XML(basepoller.BasePollerFT):
                 xpath + "/addresslist[@type='URL']/address",
                 namespaces=self.prefixmap
             )
-            _iterators.append(itertools.imap(
+            _iterators.append(map(
                 functools.partial(_build_URL, 'office365.%s' % p.lower()),
                 pURLs
             ))
@@ -182,7 +182,7 @@ class O365XML(basepoller.BasePollerFT):
                 i['sources'] = list(set(i['sources']) | set(cvalue['sources']))
             idict[indicator] = i
 
-        return itertools.imap(lambda i: i[1], idict.iteritems())
+        return map(lambda i: i[1], iter(idict.items()))
 
     def _extract_products(self, rtree):
         products = rtree.xpath(XPATH_PRODUCTS)
@@ -361,7 +361,7 @@ class O365API(basepoller.BasePollerFT):
                         else:
                             oldv['{}_list'.format(label)].add(str(val))
 
-        for i, v in indicators.iteritems():
+        for i, v in indicators.items():
             for fn in O365_API_FIELDS:
                 label = 'o365_{}_list'.format(fn)
                 v[label] = list(v[label])

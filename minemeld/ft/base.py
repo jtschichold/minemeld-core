@@ -16,7 +16,7 @@
 This module implements minemeld.ft.base.BaseFT, the base class for nodes.
 """
 
-from __future__ import absolute_import
+
 
 import logging
 import copy

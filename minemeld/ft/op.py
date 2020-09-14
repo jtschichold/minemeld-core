@@ -86,7 +86,7 @@ class AggregateFT(actorbase.ActorBaseFT):
 
         result['_added'] = ov['_added']
 
-        for k in nv.keys():
+        for k in list(nv.keys()):
             result[k] = nv[k]
 
         return result

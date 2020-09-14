@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import absolute_import
+
 
 import logging
 import os
@@ -312,7 +312,7 @@ class Taxii2Client(basepoller.BasePollerFT):
             indicators = []
 
             # noinspection PyCompatibility
-            for i_type, i_patterns in comparisons.iteritems():
+            for i_type, i_patterns in comparisons.items():
                 # The Pattern Inspector buckets each comparison expression in the observable expression based on type
                 if i_type in _STIX2_TYPES_TO_MM_TYPES:
                     # The Pattern Inspector reduces the observable expression into a flat list of comparison expressions
@@ -354,7 +354,7 @@ class Taxii2Client(basepoller.BasePollerFT):
                 if 'type' in obj and obj['type'] in types:
                     yield obj
                 else:
-                    objs.extend(obj.values())
+                    objs.extend(list(obj.values()))
             elif isinstance(obj, list):
                 objs.extend(obj)
 

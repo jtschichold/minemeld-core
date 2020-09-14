@@ -25,7 +25,7 @@ import logging
 import math
 import pytz
 from datetime import timedelta
-from urlparse import urljoin
+from urllib.parse import urljoin
 
 from . import basepoller
 from .utils import interval_in_sec, EPOCH
@@ -167,7 +167,7 @@ class Triage(basepoller.BasePollerFT):
         return int(math.ceil(int(total_entries)/float(_RESULTS_PER_PAGE)))
 
     def _iterate_over_pages(self, start_date, num_of_pages):
-        for page_num in xrange(1, num_of_pages+1):
+        for page_num in range(1, num_of_pages+1):
             r = self._perform_api_call(start_date, page_num)
 
             processed_data = r.json()
