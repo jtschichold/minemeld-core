@@ -99,14 +99,14 @@ def _eval_expression(eb, i):
 class MineMeldFTBaseTests(unittest.TestCase):
     def test_simple(self):
         eb = _parse_string('sources == "http://dshield.org/blocklist"')
-        self.assertEqual(eb.expression, u'sources')
+        self.assertEqual(eb.expression, 'sources')
         self.assertEqual(eb.comparator, operator.eq)
         self.assertEqual(eb.value, 'http://dshield.org/blocklist')
 
     def test_func(self):
         eb = _parse_string('length(max(dshield_nattacks)) == '
                            '"http://dshield.org/blocklist"')
-        self.assertEqual(eb.expression, u'length(max(dshield_nattacks))')
+        self.assertEqual(eb.expression, 'length(max(dshield_nattacks))')
         self.assertEqual(eb.comparator, operator.eq)
         self.assertEqual(eb.value, 'http://dshield.org/blocklist')
 

@@ -245,17 +245,17 @@ class MineMeldTracedStorage(unittest.TestCase):
         store = minemeld.traced.storage.Store()
 
         t1 = time.time()
-        for j in xrange(num_lines):
+        for j in range(num_lines):
             value = '{ "log": %d }' % random.randint(0, 0xFFFFFFFF)
         t2 = time.time()
         dt = t2-t1
 
         t1 = time.time()
-        for j in xrange(num_lines):
+        for j in range(num_lines):
             value = '{ "log": %d }' % random.randint(0, 0xFFFFFFFF)
             store.write(j, value)
         t2 = time.time()
-        print "TIME: Inserted %d lines in %d sec" % (num_lines, (t2-t1-dt))
+        print("TIME: Inserted %d lines in %d sec" % (num_lines, (t2-t1-dt)))
 
         store.stop()
         shutil.rmtree('1970-01-01')

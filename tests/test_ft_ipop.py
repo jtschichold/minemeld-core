@@ -47,7 +47,7 @@ def check_for_rpc(call_args_list, check_list, all_here=False):
     for chk in check_list:
         LOG.debug("checking: %s", chk)
 
-        for j in xrange(len(call_args_list)):
+        for j in range(len(call_args_list)):
             if j in found:
                 continue
 
@@ -69,7 +69,7 @@ def check_for_rpc(call_args_list, check_list, all_here=False):
                 continue
 
             failed = False
-            for k in chkvalue.keys():
+            for k in list(chkvalue.keys()):
                 if k not in argsvalue:
                     failed = True
                     break
@@ -1243,7 +1243,7 @@ class MineMeldFTIPOpTests(unittest.TestCase):
         a.start()
 
         t1 = time.time()
-        for j in xrange(num_intervals):
+        for j in range(num_intervals):
             start = random.randint(0, 0xFFFFFFFF)
             if random.randint(0, 4) == 0:
                 start = start & 0xFFFFFF00
@@ -1257,7 +1257,7 @@ class MineMeldFTIPOpTests(unittest.TestCase):
         dt = t2-t1
 
         t1 = time.time()
-        for j in xrange(num_intervals):
+        for j in range(num_intervals):
             start = random.randint(0, 0xFFFFFFFF)
             if random.randint(0, 4) == 0:
                 start = start & 0xFFFFFF00
@@ -1272,10 +1272,10 @@ class MineMeldFTIPOpTests(unittest.TestCase):
                 'sources': ['s1s']
             })
         t2 = time.time()
-        print "TIME: Inserted %d intervals in %d" % (num_intervals, (t2-t1-dt))
+        print("TIME: Inserted %d intervals in %d" % (num_intervals, (t2-t1-dt)))
 
         t1 = time.time()
-        for j in xrange(num_intervals):
+        for j in range(num_intervals):
             ochannel.publish.reset_mock()
             a.filtered_update('s1', indicator='%s' % (start), value={
                 'type': 'IPv4',
@@ -1283,7 +1283,7 @@ class MineMeldFTIPOpTests(unittest.TestCase):
                 'count': j
             })
         t2 = time.time()
-        print "TIME: Updated %d intervals in %d" % (num_intervals, (t2-t1-dt))
+        print("TIME: Updated %d intervals in %d" % (num_intervals, (t2-t1-dt)))
 
         a.stop()
 
@@ -1314,7 +1314,7 @@ class MineMeldFTIPOpTests(unittest.TestCase):
         a.start()
 
         t1 = time.time()
-        for _ in xrange(num_intervals):
+        for _ in range(num_intervals):
             end = random.randint(0, 0xFFFFFFFF)
             start = random.randint(0, end)
             end = netaddr.IPAddress(end)
@@ -1324,7 +1324,7 @@ class MineMeldFTIPOpTests(unittest.TestCase):
         dt = t2-t1
 
         t1 = time.time()
-        for j in xrange(num_intervals):
+        for j in range(num_intervals):
             end = random.randint(0, 0xFFFFFFFF)
             start = random.randint(0, end)
             end = netaddr.IPAddress(end)
@@ -1335,7 +1335,7 @@ class MineMeldFTIPOpTests(unittest.TestCase):
                 'sources': ['s1s']
             })
         t2 = time.time()
-        print "TIME: Inserted %d intervals in %d" % (num_intervals, (t2-t1-dt))
+        print("TIME: Inserted %d intervals in %d" % (num_intervals, (t2-t1-dt)))
 
         a.stop()
 

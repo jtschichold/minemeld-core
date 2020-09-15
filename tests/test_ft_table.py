@@ -76,7 +76,7 @@ class MineMeldFTTableTests(unittest.TestCase):
         table.create_index('a')
 
         num_below_500 = 0
-        for i in xrange(NUM_ELEMENTS):
+        for i in range(NUM_ELEMENTS):
             value = {'a': random.randint(0, 1000)}
             key = 'i%d' % i
             table.put(key, value)
@@ -95,13 +95,13 @@ class MineMeldFTTableTests(unittest.TestCase):
         table = minemeld.ft.table.Table(TABLENAME)
         table.create_index('a')
 
-        for i in xrange(NUM_ELEMENTS):
+        for i in range(NUM_ELEMENTS):
             value = {'a': 1483184218151+random.randint(600, 1000)}
             key = 'i%d' % i
             table.put(key, value)
 
         num_below_500 = 0
-        for i in xrange(NUM_ELEMENTS):
+        for i in range(NUM_ELEMENTS):
             value = {'a': 1483184218151+random.randint(0, 1000)}
             key = 'i%d' % i
             table.put(key, value)
@@ -120,17 +120,17 @@ class MineMeldFTTableTests(unittest.TestCase):
         table = minemeld.ft.table.Table(TABLENAME)
         table.create_index('a')
 
-        for i in xrange(NUM_ELEMENTS):
+        for i in range(NUM_ELEMENTS):
             value = {'a': 1483184218151+random.randint(0, 500)}
             key = 'i%d' % i
             table.put(key, value)
 
-        for i in xrange(NUM_ELEMENTS):
+        for i in range(NUM_ELEMENTS):
             key = 'i%d' % i
             table.delete(key)
 
         num_below_500 = 0
-        for i in xrange(NUM_ELEMENTS):
+        for i in range(NUM_ELEMENTS):
             value = {'a': 1483184218151+random.randint(0, 1000)}
             key = 'i%d' % i
             table.put(key, value)
@@ -228,10 +228,10 @@ class MineMeldFTTableTests(unittest.TestCase):
             table.put(key, value)
 
         # check number of indicators added
-        self.assertEqual(table.num_indicators, len(d.keys()))
+        self.assertEqual(table.num_indicators, len(list(d.keys())))
 
         # check sorted query retrieval
-        flatdict = sorted(d.items(), key=lambda x: x[1]['a'])
+        flatdict = sorted(list(d.items()), key=lambda x: x[1]['a'])
         j = 0
         for k, v in table.query('a', from_key=0, to_key=500,
                                 include_value=True):
@@ -257,8 +257,8 @@ class MineMeldFTTableTests(unittest.TestCase):
                 d[i] = v
 
             # check num of indicators
-            self.assertEqual(table.num_indicators, len(d.keys()))
-            flatdict = sorted(d.items(), key=lambda x: x[1]['a'])
+            self.assertEqual(table.num_indicators, len(list(d.keys())))
+            flatdict = sorted(list(d.items()), key=lambda x: x[1]['a'])
             j = 0
             for k, v in table.query('a', from_key=0, to_key=500,
                                     include_value=True):
@@ -275,10 +275,10 @@ class MineMeldFTTableTests(unittest.TestCase):
         table = minemeld.ft.table.Table(TABLENAME)
         table.create_index('a')
 
-        self.assertEqual(table.num_indicators, len(d.keys()))
+        self.assertEqual(table.num_indicators, len(list(d.keys())))
 
         # check sort again
-        flatdict = sorted(d.items(), key=lambda x: x[1]['a'])
+        flatdict = sorted(list(d.items()), key=lambda x: x[1]['a'])
         j = 0
         for k, v in table.query('a', from_key=0, to_key=500,
                                 include_value=True):
@@ -297,16 +297,16 @@ class MineMeldFTTableTests(unittest.TestCase):
         d = {}
 
         t1 = time.time()
-        for i in xrange(100000):
+        for i in range(100000):
             value = {'a': random.randint(0, 500)}
             key = 'i%d' % i
             d[key] = value
             table.put(key, value)
         t2 = time.time()
-        print 'TIME: Written %d elements in %s secs' % (100000, t2-t1)
+        print('TIME: Written %d elements in %s secs' % (100000, t2-t1))
 
         # check number of indicators added
-        self.assertEqual(table.num_indicators, len(d.keys()))
+        self.assertEqual(table.num_indicators, len(list(d.keys())))
 
         table.close()
         table = None

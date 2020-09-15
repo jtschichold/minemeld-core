@@ -82,10 +82,7 @@ class MineMeldFTTaxiiTests(unittest.TestCase):
         b.start()
 
         testfiles = os.listdir(MYDIR)
-        testfiles = filter(
-            lambda x: x.startswith('test_ft_taxii_stix_package_'),
-            testfiles
-        )
+        testfiles = [x for x in testfiles if x.startswith('test_ft_taxii_stix_package_')]
 
         for t in testfiles:
             with open(os.path.join(MYDIR, t), 'r') as f:
@@ -115,7 +112,7 @@ class MineMeldFTTaxiiTests(unittest.TestCase):
                 'ttps': stix_objects['ttps'],
                 'observables': stix_objects['observables']
             }
-            indicators = [[iid, iv, params] for iid, iv in stix_objects['indicators'].iteritems()]
+            indicators = [[iid, iv, params] for iid, iv in stix_objects['indicators'].items()]
 
             for i in indicators:
                 result = b._process_item(i)
@@ -459,7 +456,7 @@ class MineMeldFTTaxiiTests(unittest.TestCase):
         # unicast
         b.filtered_update(
             'a',
-            indicator=u'☃.net/påth',
+            indicator='☃.net/påth',
             value={
                 'type': 'URL',
                 'confidence': 100,
@@ -480,7 +477,7 @@ class MineMeldFTTaxiiTests(unittest.TestCase):
         indicator = stixdict['indicators'][0]
         cyboxprops = indicator['observable']['object']['properties']
         self.assertEqual(cyboxprops['type'], 'URL')
-        self.assertEqual(cyboxprops['value'], u'\u2603.net/p\xe5th')
+        self.assertEqual(cyboxprops['value'], '\u2603.net/p\xe5th')
         SR_mock.reset_mock()
 
         b.stop()
@@ -516,7 +513,7 @@ class MineMeldFTTaxiiTests(unittest.TestCase):
         # unicast
         b.filtered_update(
             'a',
-            indicator=u'☃.net/påth',
+            indicator='☃.net/påth',
             value={
                 'type': 'URL',
                 'confidence': 100,
@@ -537,7 +534,7 @@ class MineMeldFTTaxiiTests(unittest.TestCase):
         # unicast
         b.filtered_update(
             'a',
-            indicator=u'☃.net/påth',
+            indicator='☃.net/påth',
             value={
                 'type': 'URL',
                 'confidence': 100,
@@ -558,7 +555,7 @@ class MineMeldFTTaxiiTests(unittest.TestCase):
         indicator = stixdict['indicators'][0]
         cyboxprops = indicator['observable']['object']['properties']
         self.assertEqual(cyboxprops['type'], 'URL')
-        self.assertEqual(cyboxprops['value'], u'\u2603.net/p\xe5th')
+        self.assertEqual(cyboxprops['value'], '\u2603.net/p\xe5th')
 
         b.stop()
 

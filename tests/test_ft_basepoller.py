@@ -1179,13 +1179,13 @@ class MineMeldFTBasePollerTests(unittest.TestCase):
                        sleep_mock, spawnl_mock, spawn_mock):
         t = minemeld.ft.table.Table(FTNAME, truncate=True)
         bpt1 = minemeld.ft.basepoller._BPTable_v1(t, type_in_key=True)
-        bpt1.put(indicator=u'☃.net/påth', value={u'☃.net/påth': 1, 'type': u'☃.net/påth'})
-        t = bpt1.get(u'☃.net/påth', itype=u'☃.net/påth')
+        bpt1.put(indicator='☃.net/påth', value={'☃.net/påth': 1, 'type': '☃.net/påth'})
+        t = bpt1.get('☃.net/påth', itype='☃.net/påth')
         self.assertNotEqual(t, None)
 
         k, v = next(bpt1.query(include_value=True))
-        self.assertEqual(k, u'☃.net/påth')
-        self.assertEqual(v, {u'☃.net/påth': 1, 'type': u'☃.net/påth'})
+        self.assertEqual(k, '☃.net/påth')
+        self.assertEqual(v, {'☃.net/påth': 1, 'type': '☃.net/påth'})
 
         bpt1.close()
 

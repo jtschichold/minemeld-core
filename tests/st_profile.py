@@ -35,7 +35,7 @@ def queries(st):
     # t1 = time.time()
 
     j = 0
-    for j in xrange(num_queries):
+    for j in range(num_queries):
         q = random.randint(0, 0xFFFFFFFF)
         next(st.cover(q), None)
     # t2 = time.time()
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     st = minemeld.ft.st.ST(TABLENAME, 32, truncate=True)
 
     t1 = time.time()
-    for j in xrange(num_intervals):
+    for j in range(num_intervals):
         end = random.randint(0, 0xFFFFFFFF)
         if random.randint(0, 1) == 0:
             end = end & 0xFFFFFF00
@@ -61,7 +61,7 @@ if __name__ == '__main__':
     dt = t2-t1
 
     t1 = time.time()
-    for j in xrange(num_intervals):
+    for j in range(num_intervals):
         end = random.randint(0, 0xFFFFFFFF)
         if random.randint(0, 1) == 0:
             start = end & 0xFFFFFF00
@@ -71,6 +71,6 @@ if __name__ == '__main__':
         sid = uuid.uuid4().bytes
         st.put(sid, start, end)
     t2 = time.time()
-    print "TIME: Inserted %d intervals in %d" % (num_intervals, (t2-t1-dt))
+    print("TIME: Inserted %d intervals in %d" % (num_intervals, (t2-t1-dt)))
 
     queries(st)

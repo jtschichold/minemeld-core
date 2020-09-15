@@ -2,12 +2,12 @@
 
 import logging
 import time
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import os
 import sys
 import re
 
-from itertools import izip_longest
+from itertools import zip_longest
 
 import requests
 import urllib3
@@ -326,21 +326,21 @@ def check_feeds(mmurl):
         with open(fname, 'r') as f:
             result = f.readlines()
 
-        LOG.info('Checking {}...'.format(urllib.unquote(req)))
+        LOG.info('Checking {}...'.format(urllib.parse.unquote(req)))
         response = requests.get(
-            '{}/feeds/{}'.format(mmurl, urllib.unquote(req)),
+            '{}/feeds/{}'.format(mmurl, urllib.parse.unquote(req)),
             verify=False
         )
         response.raise_for_status()
 
         clines = response.content.splitlines()
 
-        for idx, (cl, rl) in enumerate(izip_longest(result, clines)):
+        for idx, (cl, rl) in enumerate(zip_longest(result, clines)):
             cl = remove_timestamps(cl.strip())
             rl = remove_timestamps(rl.strip())
 
             if cl != rl:
-                LOG.error('{} does not match'.format(urllib.unquote(req)))
+                LOG.error('{} does not match'.format(urllib.parse.unquote(req)))
                 LOG.error('L{}    expected: {!r}'.format(idx, rl))
                 LOG.error('L{}    result:   {!r}'.format(idx, cl))
                 
