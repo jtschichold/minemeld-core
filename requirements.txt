@@ -27,7 +27,7 @@ cifsdk==2.0.14
 lz4
 networkx==1.11
 unicodecsv==0.14.1
-Werkzeug==0.12.2
+Werkzeug
 pyzmq
 stix2-patterns==1.1.0
 antlr4-python3-runtime

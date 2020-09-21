@@ -19,7 +19,7 @@ import libtaxii.messages_11
 import libtaxii.constants
 
 from flask import request
-from flask.ext.login import current_user
+from flask_login import current_user
 
 from . import config
 from .taxiiutils import taxii_check, taxii_make_response, get_taxii_feeds

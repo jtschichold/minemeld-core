@@ -32,9 +32,9 @@ import pytz
 
 LOG = logging.getLogger(__name__)
 
-START_KEY = '%016x%015x' % (0, 0)
+START_KEY = ('%016x%015x' % (0, 0)).encode('utf-8')
 
-TABLE_MAX_COUNTER_KEY = 'MAX_COUNTER'
+TABLE_MAX_COUNTER_KEY = b'MAX_COUNTER'
 
 
 class TableNotFound(Exception):
@@ -102,20 +102,20 @@ class Table(object):
         return len(self.refs)
 
     def put(self, key, value):
-        self.last_used = time.time()
+        value = value.encode('utf-8') if isinstance(value, str) else value
 
         self.max_counter += 1
         new_max_counter = '%016x' % self.max_counter
 
         batch = self.db.write_batch()
-        batch.put(key+new_max_counter, value)
-        batch.put(TABLE_MAX_COUNTER_KEY, new_max_counter)
+        batch.put((key+new_max_counter).encode('utf-8'), value)
+        batch.put(TABLE_MAX_COUNTER_KEY, new_max_counter.encode('utf-8'))
         batch.write()
 
     def backwards_iterator(self, timestamp, counter):
         return self.db.iterator(
             start=START_KEY,
-            stop=('%016x%016x' % (timestamp, counter)),
+            stop=('%016x%016x' % (timestamp, counter)).encode('utf-8'),
             include_start=False,
             include_stop=True,
             reverse=True
@@ -304,7 +304,7 @@ class Store(object):
         if self._stop.is_set():
             raise RuntimeError('stopping')
 
-        tssec = timestamp/1000
+        tssec = timestamp//1000
         day = '%016x' % (tssec - (tssec % 86400))
 
         table = self._get_table(day, 'write')
@@ -322,7 +322,7 @@ class Store(object):
         if self._stop.is_set():
             raise RuntimeError('stopping')
 
-        tssec = timestamp/1000
+        tssec = timestamp//1000
         current_day = (tssec - (tssec % 86400))
 
         oldest_table = Table.oldest_table()
@@ -401,7 +401,7 @@ class Store(object):
 
         self._stop.set()
         self.current_tables_lock.acquire()
-        for t in self.current_tables.keys():
+        for t in list(self.current_tables.keys()):
             self.current_tables[t].close()
             self.current_tables.pop(t, None)
         self.current_tables_lock.release()

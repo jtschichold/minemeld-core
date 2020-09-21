@@ -20,7 +20,7 @@ from contextlib import contextmanager
 
 import unicodecsv
 from flask import request, jsonify, Response, stream_with_context
-from flask.ext.login import current_user
+from flask_login import current_user
 from gevent import sleep
 from netaddr import IPRange, IPNetwork, IPSet, AddrFormatError
 

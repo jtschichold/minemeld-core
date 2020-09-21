@@ -15,7 +15,7 @@
 import collections
 
 from flask import request, jsonify
-from flask.ext.login import current_user
+from flask_login import current_user
 
 from . import config
 from .aaa import MMBlueprint
@@ -35,8 +35,7 @@ FEEDS_ATTRS_ATTR = 'FEEDS_ATTRS'
 
 Subsystem = collections.namedtuple(
     'Subsystem',
-    ['authdb', 'attrs', 'enabled', 'enabled_default'],
-    verbose=True
+    ['authdb', 'attrs', 'enabled', 'enabled_default']
 )
 
 

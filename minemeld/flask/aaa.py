@@ -18,7 +18,7 @@ from functools import wraps
 
 import gevent
 import gevent.lock
-import flask.ext.login
+import flask_login
 from flask import current_app, Blueprint, request
 
 from . import config
@@ -270,7 +270,7 @@ def authenticated_user_factory(_id):
     raise RuntimeError('Unknown user_id prefix: {}'.format(_id))
 
 
-LOGIN_MANAGER = flask.ext.login.LoginManager()
+LOGIN_MANAGER = flask_login.LoginManager()
 LOGIN_MANAGER.session_protection = None
 LOGIN_MANAGER.anonymous_user = MMAnonynmousUser
 

@@ -39,7 +39,7 @@ class MineMeldTracedStorage(unittest.TestCase):
         comm = comm_mock.comm_factory(config)
         store = traced_mock.store_factory()
 
-        writer = minemeld.traced.writer.Writer(comm, store, 'TESTTOPIC')
+        writer = minemeld.traced.writer.Writer(comm, store, 'TESTTOPIC', {})
         self.assertEqual(comm.sub_channels[0]['topic'], 'TESTTOPIC')
         self.assertEqual(comm.sub_channels[0]['allowed_methods'], ['log'])
 

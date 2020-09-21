@@ -24,11 +24,18 @@ import os
 import os.path
 
 import minemeld.run.config
+from minemeld.loader import MMEntryPoint
 
 MYDIR = os.path.dirname(__file__)
 
 os.environ['MINEMELD_PROTOTYPE_PATH'] = MYDIR
 
+MOCK_HTTPFT = MMEntryPoint(
+    ep=None,
+    name='minemeld.ft.http.HttpFT',
+    conflicts=[],
+    loadable=True
+)
 
 class MineMeldRunConfigTests(unittest.TestCase):
     def test_defaults_from_file(self):
@@ -36,14 +43,15 @@ class MineMeldRunConfigTests(unittest.TestCase):
 
         config = minemeld.run.config.load_config(emptypath)
 
-        self.assertEqual(config.fabric['class'], 'AMQP')
-        self.assertEqual(config.fabric['config'], {'num_connections': 5})
-        self.assertEqual(config.mgmtbus['transport']['class'], 'AMQP')
-        self.assertEqual(config.mgmtbus['transport']['config'], {'num_connections': 1})
+        self.assertEqual(config.fabric['class'], 'ZMQRedis')
+        self.assertEqual(config.fabric['config'], {'num_connections': 50, 'priority': -2})
+        self.assertEqual(config.mgmtbus['transport']['class'], 'ZMQRedis')
+        self.assertEqual(config.mgmtbus['transport']['config'], {'num_connections': 10, 'priority': 2})
         self.assertEqual(config.mgmtbus['master'], {})
         self.assertEqual(config.mgmtbus['slave'], {})
 
-    def test_prototype_1(self):
+    @mock.patch('minemeld.loader.map', return_value={'minemeld.ft.http.HttpFT': MOCK_HTTPFT})
+    def test_prototype_1(self, map_mock):
         protopath = os.path.join(MYDIR, 'test-prototype-1.yml')
 
         config = minemeld.run.config.load_config(protopath)

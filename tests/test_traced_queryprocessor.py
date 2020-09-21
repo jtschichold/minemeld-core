@@ -72,8 +72,8 @@ class MineMeldTracedStorage(unittest.TestCase):
         num_logs = 0
         eoq = False
         for call in SR_mock.mock_calls[1:]:
-            name, args, kwargs = call
-            self.assertEqual(name, '().publish')
+            name, args, _ = call
+            self.assertEqual(name, 'from_url().publish')
             self.assertEqual(args[0], 'mm-traced-q.uuid-test')
 
             if args[1] == '<EOQ>':
@@ -107,8 +107,8 @@ class MineMeldTracedStorage(unittest.TestCase):
         num_logs = 0
         eoq = False
         for call in SR_mock.mock_calls[1:]:
-            name, args, kwargs = call
-            self.assertEqual(name, '().publish')
+            name, args, _ = call
+            self.assertEqual(name, 'from_url().publish')
             self.assertEqual(args[0], 'mm-traced-q.uuid-test')
 
             if args[1] == '<EOQ>':
@@ -145,8 +145,8 @@ class MineMeldTracedStorage(unittest.TestCase):
         num_logs = 0
         eoq = False
         for call in SR_mock.mock_calls[1:]:
-            name, args, kwargs = call
-            self.assertEqual(name, '().publish')
+            name, args, _ = call
+            self.assertEqual(name, 'from_url().publish')
             self.assertEqual(args[0], 'mm-traced-q.uuid-test')
 
             if args[1] == '<EOQ>':
@@ -192,8 +192,8 @@ class MineMeldTracedStorage(unittest.TestCase):
         num_logs = 0
         eoq = False
         for call in SR_mock.mock_calls[1:]:
-            name, args, kwargs = call
-            self.assertEqual(name, '().publish')
+            name, args, _ = call
+            self.assertEqual(name, 'from_url().publish')
             self.assertEqual(args[0], 'mm-traced-q.uuid-test')
 
             if args[1] == '<EOQ>':
@@ -239,8 +239,8 @@ class MineMeldTracedStorage(unittest.TestCase):
         num_logs = 0
         eoq = False
         for call in SR_mock.mock_calls[1:]:
-            name, args, kwargs = call
-            self.assertEqual(name, '().publish')
+            name, args, _ = call
+            self.assertEqual(name, 'from_url().publish')
             self.assertEqual(args[0], 'mm-traced-q.uuid-test')
 
             if args[1] == '<EOQ>':
@@ -286,8 +286,8 @@ class MineMeldTracedStorage(unittest.TestCase):
         num_logs = 0
         eoq = False
         for call in SR_mock.mock_calls[1:]:
-            name, args, kwargs = call
-            self.assertEqual(name, '().publish')
+            name, args, _ = call
+            self.assertEqual(name, 'from_url().publish')
             self.assertEqual(args[0], 'mm-traced-q.uuid-test')
 
             if args[1] == '<EOQ>':
@@ -333,8 +333,8 @@ class MineMeldTracedStorage(unittest.TestCase):
         num_logs = 0
         eoq = False
         for call in SR_mock.mock_calls[1:]:
-            name, args, kwargs = call
-            self.assertEqual(name, '().publish')
+            name, args, _ = call
+            self.assertEqual(name, 'from_url().publish')
             self.assertEqual(args[0], 'mm-traced-q.uuid-test')
 
             if args[1] == '<EOQ>':
@@ -380,8 +380,8 @@ class MineMeldTracedStorage(unittest.TestCase):
         num_logs = 0
         eoq = False
         for call in SR_mock.mock_calls[1:]:
-            name, args, kwargs = call
-            self.assertEqual(name, '().publish')
+            name, args, _ = call
+            self.assertEqual(name, 'from_url().publish')
             self.assertEqual(args[0], 'mm-traced-q.uuid-test')
 
             if args[1] == '<EOQ>':
@@ -427,8 +427,8 @@ class MineMeldTracedStorage(unittest.TestCase):
         num_logs = 0
         eoq = False
         for call in SR_mock.mock_calls[1:]:
-            name, args, kwargs = call
-            self.assertEqual(name, '().publish')
+            name, args, _ = call
+            self.assertEqual(name, 'from_url().publish')
             self.assertEqual(args[0], 'mm-traced-q.uuid-test')
 
             if args[1] == '<EOQ>':
@@ -459,8 +459,8 @@ class MineMeldTracedStorage(unittest.TestCase):
         num_logs = 0
         eoq = False
         for call in SR_mock.mock_calls[1:]:
-            name, args, kwargs = call
-            self.assertEqual(name, '().publish')
+            name, args, _ = call
+            self.assertEqual(name, 'from_url().publish')
             self.assertEqual(args[0], 'mm-traced-q.uuid-test')
 
             if args[1] == '<EOQ>':

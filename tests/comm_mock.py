@@ -23,12 +23,13 @@ class MockComm(object):
         self.sub_channels = []
         self.rpc_server_channels = []
 
-    def request_sub_channel(self, topic, obj=None, allowed_methods=None, name=None):
+    def request_sub_channel(self, topic, obj=None, allowed_methods=None, name=None, multi_write=False):
         self.sub_channels.append({
             'topic': topic,
             'obj': obj,
             'allowed_methods': allowed_methods,
-            'name': name
+            'name': name,
+            'multi_write': multi_write
         })
 
     def request_rpc_server_channel(self, name, obj=None, allowed_methods=[],

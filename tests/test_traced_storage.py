@@ -80,7 +80,7 @@ class MineMeldTracedStorage(unittest.TestCase):
         table = minemeld.traced.storage.Table(TABLENAME, create_if_missing=False)
         iterator = table.backwards_iterator(1, 0xFFFFFFFFFFFFFFFF)
         ts, line = next(iterator)
-        self.assertEqual(line, 'value0')
+        self.assertEqual(line, b'value0')
         self.assertEqual(int(ts[:16], 16), 0)
         self.assertEqual(int(ts[16:], 16), 0)
         self.assertRaises(StopIteration, next, iterator)
