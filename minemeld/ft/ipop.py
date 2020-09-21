@@ -311,7 +311,7 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
                 )
             return
 
-        uuidbytes = v['_id']
+        uuidbytes = v['_id'].encode('utf-8')
         self.st.put(uuidbytes, start, end, level=level)
 
         rangesa = set(self._calc_ipranges(rangestart, rangestop))
@@ -377,7 +377,7 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
         rangesb = set(self._calc_ipranges(rangestart, rangestop))
         LOG.debug("ranges before: %s", rangesb)
 
-        uuidbytes = v['_id']
+        uuidbytes = v['_id'].encode('utf-8')
         self.st.delete(uuidbytes, start, end, level=level)
 
         rangesa = set(self._calc_ipranges(rangestart, rangestop))
@@ -409,7 +409,7 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
                 u.indicator(),
                 value=self._calc_indicator_value(
                     u.uuids,
-                    additional_uuid=v['_id'],
+                    additional_uuid=v['_id'].encode('utf-8'),
                     additional_value=v
                 )
             )

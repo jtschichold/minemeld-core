@@ -1,23 +1,29 @@
-# Generated from /Users/lmori/Documents/minemeld/minemeld-core/minemeld/ft/condition/BoolExpr.g4 by ANTLR 4.6
+# Generated from BoolExpr.g4 by ANTLR 4.8
 # encoding: utf-8
 from antlr4 import *
 from io import StringIO
+import sys
+if sys.version_info[1] > 5:
+	from typing import TextIO
+else:
+	from typing.io import TextIO
 
 
 # flake8: noqa
 
+
 def serializedATN():
     with StringIO() as buf:
-        buf.write("\3\u0430\ud6d1\u8206\uad2d\u4417\uaef1\u8d80\uaadd\3\22")
+        buf.write("\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3\22")
         buf.write("\63\4\2\t\2\4\3\t\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t\7\4")
         buf.write("\b\t\b\3\2\3\2\3\2\3\2\3\3\3\3\5\3\27\n\3\3\4\3\4\3\4")
         buf.write("\5\4\34\n\4\3\5\3\5\3\5\3\6\3\6\3\6\3\6\3\6\5\6&\n\6\7")
         buf.write("\6(\n\6\f\6\16\6+\13\6\3\6\3\6\3\7\3\7\3\b\3\b\3\b\2\2")
-        buf.write("\t\2\4\6\b\n\f\16\2\4\3\2\6\13\4\2\f\16\20\21/\2\20\3")
-        buf.write("\2\2\2\4\26\3\2\2\2\6\30\3\2\2\2\b\35\3\2\2\2\n \3\2\2")
-        buf.write("\2\f.\3\2\2\2\16\60\3\2\2\2\20\21\5\4\3\2\21\22\5\f\7")
-        buf.write("\2\22\23\5\16\b\2\23\3\3\2\2\2\24\27\7\17\2\2\25\27\5")
-        buf.write("\6\4\2\26\24\3\2\2\2\26\25\3\2\2\2\27\5\3\2\2\2\30\33")
+        buf.write("\t\2\4\6\b\n\f\16\2\4\3\2\6\13\4\2\f\16\20\21\2/\2\20")
+        buf.write("\3\2\2\2\4\26\3\2\2\2\6\30\3\2\2\2\b\35\3\2\2\2\n \3\2")
+        buf.write("\2\2\f.\3\2\2\2\16\60\3\2\2\2\20\21\5\4\3\2\21\22\5\f")
+        buf.write("\7\2\22\23\5\16\b\2\23\3\3\2\2\2\24\27\7\17\2\2\25\27")
+        buf.write("\5\6\4\2\26\24\3\2\2\2\26\25\3\2\2\2\27\5\3\2\2\2\30\33")
         buf.write("\7\17\2\2\31\34\5\b\5\2\32\34\5\n\6\2\33\31\3\2\2\2\33")
         buf.write("\32\3\2\2\2\34\7\3\2\2\2\35\36\7\3\2\2\36\37\7\4\2\2\37")
         buf.write("\t\3\2\2\2 !\7\3\2\2!)\5\4\3\2\"%\7\5\2\2#&\5\4\3\2$&")
@@ -76,11 +82,12 @@ class BoolExprParser ( Parser ):
     NUMBER=15
     WS=16
 
-    def __init__(self, input:TokenStream):
-        super().__init__(input)
-        self.checkVersion("4.6")
+    def __init__(self, input:TokenStream, output:TextIO = sys.stdout):
+        super().__init__(input, output)
+        self.checkVersion("4.8")
         self._interp = ParserATNSimulator(self, self.atn, self.decisionsToDFA, self.sharedContextCache)
         self._predicates = None
+
 
 
 
@@ -135,6 +142,7 @@ class BoolExprParser ( Parser ):
         finally:
             self.exitRule()
         return localctx
+
 
     class ExpressionContext(ParserRuleContext):
 
@@ -191,6 +199,7 @@ class BoolExprParser ( Parser ):
         finally:
             self.exitRule()
         return localctx
+
 
     class FunctionExpressionContext(ParserRuleContext):
 
@@ -253,6 +262,7 @@ class BoolExprParser ( Parser ):
             self.exitRule()
         return localctx
 
+
     class NoArgsContext(ParserRuleContext):
 
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
@@ -291,6 +301,7 @@ class BoolExprParser ( Parser ):
         finally:
             self.exitRule()
         return localctx
+
 
     class OneOrMoreArgsContext(ParserRuleContext):
 
@@ -371,6 +382,7 @@ class BoolExprParser ( Parser ):
             self.exitRule()
         return localctx
 
+
     class ComparatorContext(ParserRuleContext):
 
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
@@ -413,6 +425,7 @@ class BoolExprParser ( Parser ):
         finally:
             self.exitRule()
         return localctx
+
 
     class ValueContext(ParserRuleContext):
 

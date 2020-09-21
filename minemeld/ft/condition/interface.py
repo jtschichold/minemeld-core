@@ -86,4 +86,9 @@ class Condition(object):
         if r == 'null':
             r = None
 
+        # in pyhon3 only operators eq ne do not throw an error when handling None
+        if r is None or self.value is None:
+            if self.comparator not in [operator.eq, operator.ne]:
+                return False
+
         return self.comparator(r, self.value)

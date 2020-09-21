@@ -1,4 +1,4 @@
-# Generated from /Users/lmori/Documents/minemeld/minemeld-core/minemeld/ft/condition/BoolExpr.g4 by ANTLR 4.6
+# Generated from BoolExpr.g4 by ANTLR 4.8
 from antlr4 import *
 if __name__ is not None and "." in __name__:
     from .BoolExprParser import BoolExprParser
@@ -74,3 +74,5 @@ class BoolExprListener(ParseTreeListener):
         pass
 
 
+
+del BoolExprParser

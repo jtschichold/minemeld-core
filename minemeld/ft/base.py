@@ -418,7 +418,7 @@ class BaseFT(object):
             return
 
         if value is not None:
-            for k in value.keys():
+            for k in list(value.keys()):
                 if k[0] in ['_', '$']:
                     value.pop(k)
 
@@ -446,7 +446,7 @@ class BaseFT(object):
             return
 
         if value is not None:
-            for k in value.keys():
+            for k in list(value.keys()):
                 if k[0] in ['_', '$']:
                     value.pop(k)
 
@@ -483,7 +483,7 @@ class BaseFT(object):
             raise AssertionError("update received from checkpointed source")
 
         if value is not None:
-            for k in value.keys():
+            for k in list(value.keys()):
                 if k.startswith("_"):
                     value.pop(k)
 

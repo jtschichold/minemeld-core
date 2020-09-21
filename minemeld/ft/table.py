@@ -204,7 +204,7 @@ class Table(object):
             return
 
         cmetadata = ujson.dumps(metadata)
-        self.db.put(CUSTOM_METADATA, cmetadata)
+        self.db.put(CUSTOM_METADATA, cmetadata.encode('utf-8'))
 
     def close(self):
         if self.db is not None:
@@ -264,7 +264,7 @@ class Table(object):
         if type(value) == str:
             value = value.encode('utf8')
 
-        if type(value) == str:
+        if type(value) == bytes:
             key += struct.pack(">BL", 0x0, len(value))+value
         elif type(value) == int:
             key += struct.pack(">BQ", 0x1, value)
@@ -294,7 +294,7 @@ class Table(object):
         }
 
         batch = self.db.write_batch()
-        batch.put(struct.pack("BBB", 0, 1, idxid), attribute)
+        batch.put(struct.pack("BBB", 0, 1, idxid), attribute.encode('utf-8'))
         batch.write()
 
     def put(self, key, value):
@@ -315,9 +315,9 @@ class Table(object):
         self.last_update = now
 
         batch = self.db.write_batch()
-        batch.put(ikey, struct.pack(">Q", cversion)+ujson.dumps(value))
+        batch.put(ikey, struct.pack(">Q", cversion)+ujson.dumps(value).encode('utf-8'))
         batch.put(ikeyv, struct.pack(">Q", cversion))
-        batch.put(LAST_UPDATE_KEY, struct.pack(">Q", self.last_update))
+        batch.put(LAST_UPDATE_KEY, struct.pack(">Q", int(self.last_update)))
         batch.put(TABLE_LAST_GLOBAL_ID, struct.pack(">Q", self.last_global_id))
 
         if exists is None:
@@ -472,7 +472,7 @@ class Table(object):
 
                 counter = 0
                 for idx in self.indexes.keys():
-                    for i in self.query(index=idx, include_value=False):
+                    for _ in self.query(index=idx, include_value=False):
                         if counter % 512 == 0:
                             gevent.sleep(0.001)  # yield to other greenlets
                         counter += 1
@@ -530,7 +530,7 @@ class Table(object):
                 reverse=False
             )
             with ri:
-                for ikey, ekey in ri:
+                for _, ekey in ri:
                     iversion = struct.unpack(">Q", ekey[:8])[0]
                     if iversion > last_global_id:
                         last_global_id = iversion+1

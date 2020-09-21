@@ -65,7 +65,7 @@ class ST(object):
         if start <= lower and upper <= end:
             return [(lower, upper)]
 
-        mid = (lower+upper)/2
+        mid = (lower+upper)//2
 
         result = []
         if start <= mid:
@@ -91,8 +91,7 @@ class ST(object):
         if level is not None:
             res.append(level)
             if uuid_ is not None:
-                for c in uuid_:
-                    res.append(ord(c))
+                res.extend(uuid_)
 
         return res.tostring()
 
@@ -114,8 +113,7 @@ class ST(object):
             if type_ is not None:
                 res.append(type_)
                 if uuid_ is not None:
-                    for c in uuid_:
-                        res.append(ord(c))
+                    res.extend(uuid_)
 
         return res.tostring()
 
@@ -144,14 +142,14 @@ class ST(object):
             type_=TYPE_START,
             uuid_=uuid_
         )
-        batch.put(ks, "\x00")
+        batch.put(ks, b"\x00")
         ke = self._endpoint_key(
             end,
             level=level,
             type_=TYPE_END,
             uuid_=uuid_
         )
-        batch.put(ke, "\x00")
+        batch.put(ke, b"\x00")
 
         batch.write()
 
@@ -198,7 +196,7 @@ class ST(object):
         upper = self.max_endpoint*2
 
         while True:
-            mid = (lower+upper)/2
+            mid = (lower+upper)//2
             if value <= mid:
                 upper = mid
             else:
