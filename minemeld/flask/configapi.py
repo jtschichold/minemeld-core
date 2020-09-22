@@ -98,7 +98,8 @@ def _lock_timeout(resource, timeout=30):
         if result is not None:
             return result
 
-        t1 = time.sleep(0.01)
+        time.sleep(0.01)
+        t1 = time.time()
 
     return None
 
@@ -106,6 +107,8 @@ def _lock_timeout(resource, timeout=30):
 def _unlock(resource, value):
     resname = resource+':lock'
     result = SR.get(resname)
+    if result is not None:
+        result = result.decode('utf-8')
 
     if result == value:
         SR.delete(resname)
@@ -142,6 +145,7 @@ def _set_stanza(stanza, value, version, config_key=REDIS_KEY_CONFIG):
     version_key = stanza+':version'
     cversion = SR.hget(config_key, version_key)
     if cversion is not None:
+        cversion = cversion.decode('utf-8')
         if version != MMConfigVersion(version=cversion):
             raise VersionMismatchError('version mismatch, current version %s' %
                                        cversion)
@@ -160,6 +164,7 @@ def _get_stanza(stanza, config_key=REDIS_KEY_CONFIG):
     version = SR.hget(config_key, version_key)
     if version is None:
         return None
+    version = version.decode('utf-8')
 
     value = SR.hget(config_key, stanza)
     if value is None:
@@ -321,7 +326,7 @@ def _config_info():
     return {
         'fabric': fabric,
         'mgmtbus': mgmtbus,
-        'version': version,
+        'version': version.decode('utf-8'),
         'next_node_id': next_node_id,
         'changed': changed
     }
@@ -458,6 +463,8 @@ def get_config_full():
 
     except Exception as e:
         return jsonify(error={'message': str(e)}), 500
+
+    LOG.debug(f"{result}")
 
     return jsonify(result=result)
 

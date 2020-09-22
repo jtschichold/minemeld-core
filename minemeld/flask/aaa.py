@@ -72,16 +72,16 @@ class MMBlueprint(Blueprint):
 
         @wraps(f)
         def audited_view(*args, **kwargs):
-            if request and flask.ext.login.current_user:
+            if request and flask_login.current_user:
                 params = []
 
-                for key, values in request.values.iterlists():
+                for key, values in request.values.lists():
                     if key == '_':
                         continue
 
                     params.append(('value:{}'.format(key), values))
 
-                for filename, files in request.files.iterlists():
+                for filename, files in request.files.lists():
                     params.append(('file:{}'.format(filename), [file.filename for file in files]))
 
                 body = request.get_json(silent=True)
@@ -89,7 +89,7 @@ class MMBlueprint(Blueprint):
                     params.append(['jsonbody', json.dumps(body)[:1024]])
 
                 LOG.audit(
-                    user_id=flask.ext.login.current_user.get_id(),
+                    user_id=flask_login.current_user.get_id(),
                     action_name='{} {}'.format(request.method, request.path),
                     params=params
                 )
@@ -114,12 +114,12 @@ class MMBlueprint(Blueprint):
                 return f(*args, **kwargs)
 
             if not feeds:
-                if not flask.ext.login.current_user.is_authenticated():
+                if not flask_login.current_user.is_authenticated():
                     return current_app.login_manager.unauthorized()
-                if flask.ext.login.current_user.get_id().startswith('feeds/'):
+                if flask_login.current_user.get_id().startswith('feeds/'):
                     return current_app.login_manager.unauthorized()
 
-            if read_write and not flask.ext.login.current_user.is_read_write():
+            if read_write and not flask_login.current_user.is_read_write():
                 return 'Forbidden', 403
 
             return f(*args, **kwargs)
@@ -284,8 +284,8 @@ def request_loader(request):
     api_key = api_key.replace('Basic', '', 1)
 
     try:
-        api_key = base64.b64decode(api_key)
-    except TypeError:
+        api_key = base64.b64decode(api_key).decode('utf-8')
+    except (TypeError, UnicodeError):
         return None
 
     try:

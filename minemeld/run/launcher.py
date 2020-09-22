@@ -15,6 +15,7 @@
 
 
 import gevent
+import gevent.signal
 import gevent.monkey
 gevent.monkey.patch_all(thread=False, select=False)
 
@@ -51,7 +52,7 @@ def _run_chassis(fabricconfig, mgmtbusconfig, fts):
         )
         c.configure(fts)
 
-        gevent.signal(signal.SIGUSR1, c.stop)
+        gevent.signal.signal(signal.SIGUSR1, c.stop)
 
         while not c.fts_init():
             if c.poweroff.wait(timeout=0.1) is not None:
@@ -176,12 +177,12 @@ def main():
             while sum([int(t.is_alive()) for t in processes]) != 0:
                 gevent.sleep(1)
 
-    def _sigint_handler():
+    def _sigint_handler(signum, sigstack):
         LOG.info('SIGINT received')
         _cleanup()
         signal_received.set()
 
-    def _sigterm_handler():
+    def _sigterm_handler(signum, sigstack):
         LOG.info('SIGTERM received')
         _cleanup()
         signal_received.set()
@@ -273,8 +274,8 @@ def main():
     processes_lock = gevent.lock.BoundedSemaphore()
     signal_received = gevent.event.Event()
 
-    gevent.signal(signal.SIGINT, _sigint_handler)
-    gevent.signal(signal.SIGTERM, _sigterm_handler)
+    gevent.signal.signal(signal.SIGINT, _sigint_handler)
+    gevent.signal.signal(signal.SIGTERM, _sigterm_handler)
 
     try:
         mbusmaster = minemeld.mgmtbus.master_factory(

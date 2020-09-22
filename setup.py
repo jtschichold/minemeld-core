@@ -15,12 +15,6 @@
 import json
 from setuptools import Extension, setup, find_packages
 
-try:
-    from Cython.Build import cythonize
-except ImportError:
-    # this is for platter
-    cythonize = lambda x: x
-
 import sys
 import os.path
 sys.path.insert(0, os.path.abspath('.'))
@@ -33,7 +27,7 @@ with open('nodes.json') as f:
         'minemeld_nodes_validators': []
     }
     _nodes = json.load(f)
-    for node, v in _nodes.iteritems():
+    for node, v in _nodes.items():
         _entry_points['minemeld_nodes'].append(
             '{} = {}'.format(node, v['class'])
         )
@@ -55,15 +49,6 @@ with open('README.md') as f:
 
 _packages = find_packages(exclude=["*.tests", "*.tests.*", "tests.*", "tests"])
 
-GDNS = Extension(
-    name='minemeld.packages.gdns._ares',
-    sources=['minemeld/packages/gdns/_ares.pyx'],
-    include_dirs=[],
-    libraries=['cares'],
-    define_macros=[('HAVE_NETDB_H', '')],
-    depends=['minemeld/packages/gdns/dnshelper.c']
-)
-
 setup(
     name='minemeld-core',
     version=__version__,
@@ -82,7 +67,7 @@ setup(
     packages=_packages,
     provides=['minemeld'],
     install_requires=_requirements,
-    ext_modules=cythonize([GDNS]),
+    ext_modules={},
     entry_points={
         'console_scripts': [
             'mm-run = minemeld.run.launcher:main',

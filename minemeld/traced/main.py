@@ -21,6 +21,7 @@ This module implements the main entry point to the mm-traced daemon
 import gevent
 import gevent.event
 import gevent.monkey
+import gevent.signal
 gevent.monkey.patch_all(thread=False, select=False)
 
 import argparse
@@ -68,10 +69,10 @@ def _ioloop_failure(event):
 
 
 def main():
-    def _sigint_handler():
+    def _sigint_handler(signum, sigstack):
         raise KeyboardInterrupt('Ctrl-C from _sigint_handler')
 
-    def _sigterm_handler():
+    def _sigterm_handler(signum, sigstack):
         raise KeyboardInterrupt('Ctrl-C from _sigterm_handler')
 
     def _cleanup():
@@ -135,8 +136,8 @@ def main():
 
     comm.start()
 
-    gevent.signal(signal.SIGINT, _sigint_handler)
-    gevent.signal(signal.SIGTERM, _sigterm_handler)
+    gevent.signal.signal(signal.SIGINT, _sigint_handler)
+    gevent.signal.signal(signal.SIGTERM, _sigterm_handler)
 
     try:
         shutdown_event.wait()
