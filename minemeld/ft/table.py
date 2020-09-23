@@ -80,6 +80,7 @@ import time
 import logging
 import shutil
 import gevent
+from typing import Optional, Union, Iterator, Tuple
 
 
 SCHEMAVERSION_KEY = struct.pack("B", 0)
@@ -119,9 +120,9 @@ class Table(object):
         self.compact_delay = int(os.environ.get('MM_TABLE_COMPACT_DELAY', 3600))
         self._compact_glet = gevent.spawn(self._compact_loop)
 
-    def _init_db(self):
+    def _init_db(self) -> None:
         self.last_update = 0
-        self.indexes = {}
+        self.indexes: dict = {}
         self.num_indicators = 0
         self.last_global_id = 0
 
@@ -132,7 +133,7 @@ class Table(object):
         batch.put(TABLE_LAST_GLOBAL_ID, struct.pack(">Q", self.last_global_id))
         batch.write()
 
-    def _read_metadata(self):
+    def _read_metadata(self) -> None:
         sv = self._get(SCHEMAVERSION_KEY)
         if sv is None:
             return self._init_db()
@@ -181,7 +182,7 @@ class Table(object):
             raise InvalidTableException("TABLE_LAST_GLOBAL_ID not found")
         self.last_global_id = struct.unpack(">Q", t)[0]
 
-    def _get(self, key):
+    def _get(self, key: bytes) -> Optional[bytes]:
         try:
             result = self.db.get(key)
         except KeyError:
@@ -189,16 +190,16 @@ class Table(object):
 
         return result
 
-    def __del__(self):
+    def __del__(self) -> None:
         self.close()
 
-    def get_custom_metadata(self):
+    def get_custom_metadata(self) -> Optional[dict]:
         cmetadata = self._get(CUSTOM_METADATA)
         if cmetadata is None:
             return None
         return ujson.loads(cmetadata)
 
-    def set_custom_metadata(self, metadata=None):
+    def set_custom_metadata(self, metadata: Optional[dict] =None) -> None:
         if metadata is None:
             self.db.delete(CUSTOM_METADATA)
             return
@@ -206,7 +207,7 @@ class Table(object):
         cmetadata = ujson.dumps(metadata)
         self.db.put(CUSTOM_METADATA, cmetadata.encode('utf-8'))
 
-    def close(self):
+    def close(self) -> None:
         if self.db is not None:
             self.db.close()
 
@@ -216,18 +217,12 @@ class Table(object):
         self.db = None
         self._compact_glet = None
 
-    def exists(self, key):
-        if type(key) == str:
-            key = key.encode('utf8')
-
-        ikeyv = self._indicator_key_version(key)
+    def exists(self, key: str) -> bool:
+        ikeyv = self._indicator_key_version(key.encode('utf-8'))
         return (self._get(ikeyv) is not None)
 
-    def get(self, key):
-        if type(key) == str:
-            key = key.encode('utf8')
-
-        ikey = self._indicator_key(key)
+    def get(self, key: str) -> Union[None, dict, str]:
+        ikey = self._indicator_key(key.encode('utf-8'))
         value = self._get(ikey)
         if value is None:
             return None
@@ -235,12 +230,10 @@ class Table(object):
         # skip version
         return ujson.loads(value[8:])
 
-    def delete(self, key):
-        if type(key) == str:
-            key = key.encode('utf8')
-
-        ikey = self._indicator_key(key)
-        ikeyv = self._indicator_key_version(key)
+    def delete(self, key: str) -> None:
+        bkey = key.encode('utf8')
+        ikey = self._indicator_key(bkey)
+        ikeyv = self._indicator_key_version(bkey)
 
         if self._get(ikeyv) is None:
             return
@@ -252,21 +245,19 @@ class Table(object):
         batch.put(NUM_INDICATORS_KEY, struct.pack(">Q", self.num_indicators))
         batch.write()
 
-    def _indicator_key(self, key):
+    def _indicator_key(self, key: bytes) -> bytes:
         return struct.pack("BB", 1, 1) + key
 
-    def _indicator_key_version(self, key):
+    def _indicator_key_version(self, key: bytes) -> bytes:
         return struct.pack("BB", 1, 0) + key
 
-    def _index_key(self, idxid, value, lastidxid=None):
+    def _index_key(self, idxid: int, value: Union[str, int], lastidxid: Optional[int]=None) -> bytes:
         key = struct.pack("BBB", 2, idxid, 0xF0)
 
-        if type(value) == str:
-            value = value.encode('utf8')
-
-        if type(value) == bytes:
-            key += struct.pack(">BL", 0x0, len(value))+value
-        elif type(value) == int:
+        if isinstance(value, str):
+            bvalue = value.encode('utf-8')
+            key += struct.pack(">BL", 0x0, len(bvalue))+bvalue
+        elif isinstance(value, int):
             key += struct.pack(">BQ", 0x1, value)
         else:
             raise ValueError("Unhandled value type: %s" % type(value))
@@ -276,10 +267,10 @@ class Table(object):
 
         return key
 
-    def _last_global_id_key(self, idxid):
+    def _last_global_id_key(self, idxid: int) -> bytes:
         return struct.pack("BBB", 2, idxid, 0)
 
-    def create_index(self, attribute):
+    def create_index(self, attribute: str) -> None:
         if attribute in self.indexes:
             return
 
@@ -297,22 +288,20 @@ class Table(object):
         batch.put(struct.pack("BBB", 0, 1, idxid), attribute.encode('utf-8'))
         batch.write()
 
-    def put(self, key, value):
-        if type(key) == str:
-            key = key.encode('utf8')
-
+    def put(self, key: str, value: dict) -> None:
         if type(value) != dict:
             raise ValueError()
 
-        ikey = self._indicator_key(key)
-        ikeyv = self._indicator_key_version(key)
+        bkey = key.encode('utf-8')
+        ikey = self._indicator_key(bkey)
+        ikeyv = self._indicator_key_version(bkey)
 
         exists = self._get(ikeyv)
         self.last_global_id += 1
         cversion = self.last_global_id
 
         now = time.time()
-        self.last_update = now
+        self.last_update = int(now)
 
         batch = self.db.write_batch()
         batch.put(ikey, struct.pack(">Q", cversion)+ujson.dumps(value).encode('utf-8'))
@@ -335,7 +324,7 @@ class Table(object):
             index['last_global_id'] += 1
 
             idxkey = self._index_key(index['id'], v, index['last_global_id'])
-            batch.put(idxkey, struct.pack(">Q", cversion) + key)
+            batch.put(idxkey, struct.pack(">Q", cversion) + bkey)
 
             batch.put(
                 self._last_global_id_key(index['id']),
@@ -344,18 +333,17 @@ class Table(object):
 
         batch.write()
 
-    def query(self, index=None, from_key=None, to_key=None,
-              include_value=False, include_stop=True, include_start=True,
-              reverse=False):
-        if type(from_key) is str:
-            from_key = from_key.encode('utf8')
-        if type(to_key) is str:
-            to_key = to_key.encode('utf8')
-
+    def query(self, index=None, from_key: Union[str,int,None]=None, to_key: Union[str,int,None]=None,
+              include_value: bool =False, include_stop: bool =True, include_start: bool =True,
+              reverse: bool =False) -> Iterator[Tuple[str, Optional[Union[None, dict, str]]]]:
         if index is None:
+            if isinstance(from_key, int):
+                raise TypeError("from_key cannot be int if index is None")
+            if isinstance(to_key, int):
+                raise TypeError("to_key cannot be int if index is None")
             return self._query_by_indicator(
-                from_key=from_key,
-                to_key=to_key,
+                from_key=from_key if from_key is None else from_key.encode('utf-8'),
+                to_key=to_key if to_key is None else to_key.encode('utf-8'),
                 include_value=include_value,
                 include_stop=include_stop,
                 include_start=include_start,
@@ -371,9 +359,9 @@ class Table(object):
             reverse=reverse
         )
 
-    def _query_by_indicator(self, from_key=None, to_key=None,
-                            include_value=False, include_stop=True,
-                            include_start=True, reverse=False):
+    def _query_by_indicator(self, from_key: Optional[bytes]=None, to_key: Optional[bytes]=None,
+                            include_value: bool=False, include_stop: bool=True,
+                            include_start: bool=True, reverse: bool=False) -> Iterator[Tuple[str, Optional[Union[None, dict, str]]]]:
         if from_key is None:
             from_key = struct.pack("BB", 1, 1)
             include_stop = False
@@ -402,25 +390,25 @@ class Table(object):
                 else:
                     yield ekey.decode('utf8', 'ignore')
 
-    def _query_by_index(self, index, from_key=None, to_key=None,
-                        include_value=False, include_stop=True,
-                        include_start=True, reverse=False):
+    def _query_by_index(self, index: str, from_key: Union[str,int,None]=None, to_key: Union[str,int,None]=None,
+                            include_value: bool=False, include_stop: bool=True,
+                            include_start: bool=True, reverse: bool=False) -> Iterator[Tuple[str, Optional[Union[None, dict, str]]]]:
         if index not in self.indexes:
             raise ValueError()
 
         idxid = self.indexes[index]['id']
 
         if from_key is None:
-            from_key = struct.pack("BBB", 2, idxid, 0xF0)
+            bfrom_key = struct.pack("BBB", 2, idxid, 0xF0)
             include_start = False
         else:
-            from_key = self._index_key(idxid, from_key)
+            bfrom_key = self._index_key(idxid, from_key)
 
         if to_key is None:
-            to_key = struct.pack("BBB", 2, idxid, 0xF1)
+            bto_key = struct.pack("BBB", 2, idxid, 0xF1)
             include_stop = False
         else:
-            to_key = self._index_key(
+            bto_key = self._index_key(
                 idxid,
                 to_key,
                 lastidxid=0xFFFFFFFFFFFFFFFF
@@ -428,8 +416,8 @@ class Table(object):
 
         ldeleted = 0
         ri = self.db.iterator(
-            start=from_key,
-            stop=to_key,
+            start=bfrom_key,
+            stop=bto_key,
             include_value=True,
             include_start=include_start,
             include_stop=include_stop,
@@ -463,7 +451,7 @@ class Table(object):
 
         LOG.info('Deleted in scan of {}: {}'.format(index, ldeleted))
 
-    def _compact_loop(self):
+    def _compact_loop(self) -> None:
         gevent.sleep(self.compact_delay)
 
         while True:
@@ -488,7 +476,7 @@ class Table(object):
             except gevent.GreenletExit:
                 break
 
-    def _upgrade_from_s0(self):
+    def _upgrade_from_s0(self) -> None:
         LOG.info('Upgrading from schema version 0 to schema version 1')
 
         LOG.info('Loading indexes...')

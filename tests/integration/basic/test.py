@@ -205,6 +205,7 @@ def wait_for_restart(mmurl, username, password):
         response.raise_for_status()
 
         supervisor_status = response.json()['result']
+        LOG.info(f'{supervisor_status}')
         engine_status = supervisor_status['processes']['minemeld-engine']['statename']
 
         if engine_status == 'RUNNING':

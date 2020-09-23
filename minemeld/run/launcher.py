@@ -200,7 +200,7 @@ def main():
 
     # logging
     loglevel = logging.INFO
-    if args.verbose:
+    if args.verbose or os.environ.get('MM_VERBOSE') is not None:
         loglevel = logging.DEBUG
 
     logging.basicConfig(

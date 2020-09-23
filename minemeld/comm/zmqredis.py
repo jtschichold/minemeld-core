@@ -37,6 +37,10 @@ import zmq.green as zmq
 LOG = logging.getLogger(__name__)
 
 
+def _bytes_serializer(o):
+    raise TypeError("ZMQRedis: {o} not JSON serializable")
+
+
 class RedisPubChannel(object):
     def __init__(self, topic, connection_pool):
         self.topic = topic
@@ -113,7 +117,7 @@ class RedisPubChannel(object):
                     self.topic,
                     self.num_publish - lagger
                 ))
-                gevent.sleep(0.1)
+                gevent.sleep(0.01)
                 lagger = self.lagger()
 
             if low_bits == 0xfff:
@@ -148,7 +152,7 @@ class ZMQRpcFanoutClientChannel(object):
             LOG.debug('RPC Fanout reply recving from {}:reply'.format(self.fanout))
             body = self.reply_socket.recv_json()
             LOG.debug('RPC Fanout reply from {}:reply recvd: {!r}'.format(self.fanout, body))
-            self.reply_socket.send('OK')
+            self.reply_socket.send_string('OK')
             LOG.debug('RPC Fanout reply from {}:reply recvd: {!r} - ok'.format(self.fanout, body))
 
             source = body.get('source', None)
@@ -182,7 +186,7 @@ class ZMQRpcFanoutClientChannel(object):
                 })
                 self.active_rpcs.pop(id_)
 
-            gevent.sleep(0)
+            gevent.sleep(0.01)
 
     def send_rpc(self, method, params=None, num_results=0, and_discard=False):
         if self.socket is None:
@@ -220,12 +224,12 @@ class ZMQRpcFanoutClientChannel(object):
 
         LOG.debug('RPC Fanout Client: send multipart to {}: {!r}'.format(self.fanout, json.dumps(body)))
         self.socket.send_multipart([
-            '{}'.format(self.fanout),
-            json.dumps(body)
+            f'{self.fanout}'.encode('utf-8'),
+            json.dumps(body).encode('utf-8')
         ])
         LOG.debug('RPC Fanout Client: send multipart to {}: {!r} - done'.format(self.fanout, json.dumps(body)))
 
-        gevent.sleep(0)
+        gevent.sleep(0.01)
 
         return event
 
@@ -278,9 +282,9 @@ class ZMQRpcServerChannel(object):
 
         if self.fanout is not None:
             reply_socket = self.context.socket(zmq.REQ)
-            reply_socket.connect('ipc:///var/run/minemeld/{}'.format(reply_to))
+            reply_socket.connect('ipc:///var/run/minemeld/{}'.format(reply_to.decode('utf-8')))
             LOG.debug('RPC Server {} result to {}'.format(self.name, reply_to))
-            reply_socket.send_json(ans)
+            reply_socket.send_json(ans, default=_bytes_serializer)
             reply_socket.recv()
             LOG.debug('RPC Server {} result to {} - done'.format(self.name, reply_to))
             reply_socket.close(linger=0)
@@ -288,20 +292,24 @@ class ZMQRpcServerChannel(object):
             reply_socket = None
 
         else:
-            self.socket.send_multipart([reply_to, '', json.dumps(ans)])
+            self.socket.send_multipart([
+                reply_to,
+                b'',
+                json.dumps(ans).encode('utf-8')
+            ])
 
     def run(self):
         if self.socket is None:
-            LOG.error('Run called with invalid socket in RPC server channel: {}'.format(self.name))
+            LOG.error(f'Run called with invalid socket in RPC server channel: {self.name}')
 
         while True:
-            LOG.debug('RPC Server receiving from {} - {}'.format(self.name, self.fanout))
+            LOG.debug(f'RPC Server receiving from {self.name} - {self.fanout}')
             toks = self.socket.recv_multipart()
             LOG.debug('RPC Server recvd from {} - {}: {!r}'.format(self.name, self.fanout, toks))
 
             if self.fanout is not None:
                 reply_to, body = toks
-                reply_to = reply_to+':reply'
+                reply_to = reply_to+b':reply'
             else:
                 reply_to, _, body = toks
 
@@ -399,12 +407,13 @@ class ZMQPubChannel(object):
         try:
             self.socket.send_json(
                 obj=body,
-                flags=zmq.NOBLOCK
+                flags=zmq.NOBLOCK,
+                default=_bytes_serializer
             )
         except zmq.ZMQError:
             LOG.error('Topic {} queue full - dropping message'.format(self.topic))
 
-        gevent.sleep(0)
+        gevent.sleep(0.01)
 
     def connect(self, context):
         if self.socket is not None:
@@ -676,7 +685,7 @@ class ZMQRedis(object):
 
         socket.connect(address)
         socket.setsockopt(zmq.LINGER, 0)
-        socket.send_json(body)
+        socket.send_json(body, default=_bytes_serializer)
         LOG.debug('RPC sent to {}:rpc for method {}'.format(dest, method))
 
         if not block:
@@ -738,7 +747,7 @@ class ZMQRedis(object):
             if len(msgs) < (top - base + 1):
                 gevent.sleep(1.0)
             else:
-                gevent.sleep(0)
+                gevent.sleep(0.01)
 
     def _ioloop_failure(self, g):
         LOG.error('_ioloop_failure')

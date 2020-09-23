@@ -23,6 +23,7 @@ import copy
 import os
 import collections
 import json
+from typing import Optional, Union, List, DefaultDict, Dict, Tuple
 
 import gevent
 
@@ -62,7 +63,8 @@ class _Filters(object):
 
             self.filters.append(cf)
 
-    def apply(self, origin=None, method=None, indicator=None, value=None):
+    def apply(self, origin: Optional[str]=None, method: Optional[str]=None,
+            indicator: Optional[str]=None, value: Optional[dict]=None) -> Tuple[Optional[str], Optional[dict]]:
         if value is None:
             d = {}
         else:
@@ -189,7 +191,7 @@ class BaseFT(object):
         chassis (object): parent chassis instance
         config (dict): node config.
     """
-    def __init__(self, name, chassis, config):
+    def __init__(self, name: str, chassis, config):
         self.name = name
 
         self.chassis = chassis
@@ -198,10 +200,10 @@ class BaseFT(object):
         self.config = config
         self.configure()
 
-        self.inputs = []
+        self.inputs: List[str] = []
         self.output = None
 
-        self.statistics = collections.defaultdict(int)
+        self.statistics: DefaultDict[str, int] = collections.defaultdict(int)
 
         self.read_checkpoint()
 
@@ -217,18 +219,18 @@ class BaseFT(object):
         self._disable_full_trace_glet = None
 
     @property
-    def state(self):
+    def state(self) -> int:
         return self._state
 
     @state.setter
-    def state(self, value):
+    def state(self, value: int):
         LOG.info("%s - transitioning to state %d", self.name, value)
         self._state = value
 
         if value >= ft_states.INIT and value <= ft_states.STOPPED:
             self.publish_status(force=True)
 
-    def read_checkpoint(self):
+    def read_checkpoint(self) -> None:
         """Reads checkpoint file from disk.
 
         First line of the checkpoint file is a UUID, the *checkpoint* received
@@ -249,17 +251,16 @@ class BaseFT(object):
             'class': (self.__class__.__module__+'.'+self.__class__.__name__),
             'config': self._original_config
         }
-        config = json.dumps(config, sort_keys=True)
 
         try:
             with open(self.name+'.chkp', 'r') as f:
                 contents = f.read()
                 if contents[0] == '{':
                     # new format
-                    contents = json.loads(contents)
-                    self.last_checkpoint = contents['checkpoint']
-                    saved_config = contents['config']
-                    saved_state = contents['state']
+                    decoded_contents = json.loads(contents)
+                    self.last_checkpoint = decoded_contents['checkpoint']
+                    saved_config = decoded_contents['config']
+                    saved_state = decoded_contents['state']
 
                 else:
                     # old format
@@ -278,7 +279,7 @@ class BaseFT(object):
 
             # old_status is missing in old releases
             # stick to the old behavior
-            if saved_config and saved_config != config:
+            if saved_config and saved_config != json.dumps(config, sort_keys=True):
                 LOG.info(
                     '%s - saved config does not match new config',
                     self.name
@@ -298,7 +299,7 @@ class BaseFT(object):
             LOG.exception('%s - Error reading last checkpoint', self.name)
             self.last_checkpoint = None
 
-    def create_checkpoint(self, value):
+    def create_checkpoint(self, value: str) -> None:
         """Saves checkpoint file to disk.
 
         Called by `checkpoint`.
@@ -321,20 +322,20 @@ class BaseFT(object):
             f.write(json.dumps(contents))
             f.write('\n')
 
-    def remove_checkpoint(self):
+    def remove_checkpoint(self) -> None:
         try:
             os.remove('{}.chkp'.format(self.name))
 
         except (IOError, OSError):
             pass
 
-    def _saved_state_restore(self, saved_state):
+    def _saved_state_restore(self, saved_state: dict) -> None:
         pass
 
-    def _saved_state_create(self):
+    def _saved_state_create(self) -> dict:
         return {}
 
-    def configure(self):
+    def configure(self) -> None:
         """Applies the config settings stored in `self.config`.
 
         Called by `__init__`.
@@ -345,7 +346,7 @@ class BaseFT(object):
         self.infilters = _Filters(self.config.get('infilters', []))
         self.outfilters = _Filters(self.config.get('outfilters', []))
 
-    def connect(self, inputs, output):
+    def connect(self, inputs: List[str], output: bool) -> None:
         if self.state != ft_states.READY:
             LOG.error('connect called in non ready FT')
             raise AssertionError('connect called in non ready FT')
@@ -359,7 +360,7 @@ class BaseFT(object):
                 allowed_methods=['update', 'withdraw', 'checkpoint']
             )
         self.inputs = inputs
-        self.inputs_checkpoint = {}
+        self.inputs_checkpoint: Dict[str,str] = {}
 
         if output:
             self.output = self.chassis.request_pub_channel(self.name)
@@ -380,7 +381,8 @@ class BaseFT(object):
 
         self.state = ft_states.CONNECTED
 
-    def apply_infilters(self, origin, method, indicator, value):
+    def apply_infilters(self, origin: Optional[str], method: Optional[str],
+                        indicator: Optional[str], value: Optional[dict]) -> Tuple[Optional[str], Optional[dict]]:
         return self.infilters.apply(
             origin=origin,
             method=method,
@@ -388,7 +390,8 @@ class BaseFT(object):
             value=value
         )
 
-    def apply_outfilters(self, origin, method, indicator, value):
+    def apply_outfilters(self, origin: Optional[str], method: Optional[str],
+                        indicator: Optional[str], value: Optional[dict]) -> Tuple[Optional[str], Optional[dict]]:
         return self.outfilters.apply(
             origin=origin,
             method=method,
@@ -401,7 +404,7 @@ class BaseFT(object):
                                      block=block, timeout=timeout)
 
     @_counting('update.tx')
-    def emit_update(self, indicator, value):
+    def emit_update(self, indicator: str, value: dict) -> None:
         if self.output is None:
             return
 
@@ -429,7 +432,7 @@ class BaseFT(object):
         })
 
     @_counting('withdraw.tx')
-    def emit_withdraw(self, indicator, value=None):
+    def emit_withdraw(self, indicator: str, value: Optional[dict]=None) -> None:
         if self.output is None:
             return
 
@@ -457,7 +460,7 @@ class BaseFT(object):
         })
 
     @_counting('checkpoint.tx')
-    def emit_checkpoint(self, value):
+    def emit_checkpoint(self, value: str) -> None:
         if self.output is None:
             return
 
@@ -467,12 +470,17 @@ class BaseFT(object):
         })
 
     @_counting('update.rx')
-    def update(self, source=None, indicator=None, value=None):
+    def update(self, source: Optional[str]=None, indicator: Optional[str]=None, value: Optional[dict]=None) -> None:
         LOG.debug('%s {%s} - update from %s value %s',
                   self.name, self.state, source, value)
 
         if not self._disable_full_trace:
-            self.trace('RECVD_UPDATE', indicator, source_node=source, value=value)
+            self.trace(
+                'RECVD_UPDATE',
+                indicator if indicator is not None else "-- NONE --",
+                source_node=source,
+                value=value
+            )
 
         if self.state not in [ft_states.STARTED, ft_states.CHECKPOINT]:
             self.statistics['error.wrong_state'] += 1
@@ -496,7 +504,12 @@ class BaseFT(object):
 
         if fltindicator is None:
             if not self._disable_full_trace:
-                self.trace('DROP_UPDATE', indicator, source_node=source, value=value)
+                self.trace(
+                    'DROP_UPDATE',
+                    indicator if indicator is not None else "-- NONE --",
+                    source_node=source,
+                    value=value
+                )
 
             self.filtered_withdraw(
                 source=source,
@@ -505,7 +518,12 @@ class BaseFT(object):
             )
             return
 
-        self.trace('ACCEPT_UPDATE', indicator, source_node=source, value=value)
+        self.trace(
+            'ACCEPT_UPDATE',
+            indicator if indicator is not None else "-- NONE --",
+            source_node=source,
+            value=value
+        )
         self.filtered_update(
             source=source,
             indicator=fltindicator,
@@ -513,16 +531,21 @@ class BaseFT(object):
         )
 
     @_counting('update.processed')
-    def filtered_update(self, source=None, indicator=None, value=None):
+    def filtered_update(self, source: Optional[str]=None, indicator: Optional[str]=None, value: Optional[dict]=None) -> None:
         raise NotImplementedError('%s: update' % self.name)
 
     @_counting('withdraw.rx')
-    def withdraw(self, source=None, indicator=None, value=None):
+    def withdraw(self, source: Optional[str]=None, indicator: Optional[str]=None, value: Optional[dict]=None) -> None:
         LOG.debug('%s {%s} - withdraw from %s value %s',
                   self.name, self.state, source, value)
 
         if not self._disable_full_trace:
-            self.trace('RECVD_WITHDRAW', indicator, source_node=source, value=value)
+            self.trace(
+                'RECVD_WITHDRAW',
+                indicator if indicator is not None else "-- NONE --",
+                source_node=source,
+                value=value
+            )
 
         if self.state not in [ft_states.STARTED, ft_states.CHECKPOINT]:
             self.statistics['error.wrong_state'] += 1
@@ -541,7 +564,12 @@ class BaseFT(object):
 
         if fltindicator is None:
             if not self._disable_full_trace:
-                self.trace('DROP_WITHDRAW', indicator, source_node=source, value=value)
+                self.trace(
+                    'DROP_WITHDRAW',
+                    indicator if indicator is not None else "-- NONE --",
+                    source_node=source,
+                    value=value
+                )
             return
 
         if fltvalue is not None:
@@ -549,7 +577,12 @@ class BaseFT(object):
                 if k.startswith("_"):
                     fltvalue.pop(k)
 
-        self.trace('ACCEPT_WITHDRAW', indicator, source_node=source, value=value)
+        self.trace(
+            'ACCEPT_WITHDRAW',
+            indicator if indicator is not None else "-- NONE --",
+            source_node=source,
+            value=value
+        )
         self.filtered_withdraw(
             source=source,
             indicator=indicator,
@@ -557,13 +590,16 @@ class BaseFT(object):
         )
 
     @_counting('withdraw.processed')
-    def filtered_withdraw(self, source=None, indicator=None, value=None):
+    def filtered_withdraw(self, source: Optional[str]=None, indicator: Optional[str]=None, value: Optional[dict]=None) -> None:
         raise NotImplementedError('%s: withdraw' % self.name)
 
     @_counting('checkpoint.rx')
-    def checkpoint(self, source=None, value=None):
+    def checkpoint(self, source: Optional[str]=None, value: Optional[str]=None) -> None:
         LOG.debug('%s {%s} - checkpoint from %s value %s',
                   self.name, self.state, source, value)
+
+        if value is None or source is None:
+            raise RuntimeError(f"{self.name} - received an invalid checkpoint: {value} from {source}")
 
         if self.state not in [ft_states.STARTED, ft_states.CHECKPOINT]:
             LOG.error("%s {%s} - checkpoint received with state not STARTED "
@@ -588,14 +624,14 @@ class BaseFT(object):
         self.last_checkpoint = value
         self.emit_checkpoint(value)
 
-    def _full_trace_timeout(self, timeout):
+    def _full_trace_timeout(self, timeout: int):
         """To be used as greenlet for disabling full trace after a specific time
         """
         gevent.sleep(timeout)
         self._disable_full_trace = True
         LOG.debug('{} - full trace disabled'.format(self.name))
 
-    def enable_full_trace(self, timeout=600):
+    def enable_full_trace(self, timeout: int=600):
         """Enables full trace
         """
 
@@ -610,7 +646,7 @@ class BaseFT(object):
         self._disable_full_trace = False
         LOG.debug('{} - full trace enabled'.format(self.name))
 
-    def publish_status(self, force=False):
+    def publish_status(self, force: bool=False):
         if force:
             self._internal_publish_status()
 
@@ -625,37 +661,37 @@ class BaseFT(object):
             status=status
         )
 
-    def mgmtbus_state_info(self):
+    def mgmtbus_state_info(self) -> dict:
         return {
             'checkpoint': self.last_checkpoint,
             'state': self.state,
             'is_source': len(self.inputs) == 0
         }
 
-    def mgmtbus_initialize(self):
+    def mgmtbus_initialize(self) -> str:
         self.state = ft_states.INIT
         self.remove_checkpoint()
         self.initialize()
         return 'OK'
 
-    def mgmtbus_rebuild(self):
+    def mgmtbus_rebuild(self) -> str:
         self.state = ft_states.REBUILDING
         self.remove_checkpoint()
         self.rebuild()
         self.state = ft_states.INIT
         return 'OK'
 
-    def mgmtbus_reset(self):
+    def mgmtbus_reset(self) -> str:
         self.state = ft_states.RESET
         self.remove_checkpoint()
         self.reset()
         self.state = ft_states.INIT
         return 'OK'
 
-    def mgmtbus_status(self):
+    def mgmtbus_status(self) -> dict:
         try:
             # if node is not ready yet to publish the length
-            length = self.length()
+            length: Optional[int] = self.length()
         except:
             length = None
 
@@ -672,9 +708,12 @@ class BaseFT(object):
         self._clock += 1
         return result
 
-    def mgmtbus_checkpoint(self, value=None):
+    def mgmtbus_checkpoint(self, value: Optional[str]=None) -> str:
         if len(self.inputs) != 0:
             return 'ignored'
+
+        if value is None:
+            raise RuntimeError(f"{self.name} - null checkpoint")
 
         self.state = ft_states.IDLE
         self.create_checkpoint(value)
@@ -683,26 +722,26 @@ class BaseFT(object):
 
         return 'OK'
 
-    def mgmtbus_hup(self, source=None):
+    def mgmtbus_hup(self, source: Optional[str]=None) -> None:
         self.hup(source=source)
 
-    def mgmtbus_signal(self, source=None, signal=None, **kwargs):
+    def mgmtbus_signal(self, source: Optional[str]=None, signal: Optional[str]=None, **kwargs):
         if signal == 'trace':
             self.enable_full_trace()
             return self._disable_full_trace
 
         raise NotImplementedError('{}: signal - not implemented'.format(self.name))
 
-    def initialize(self):
+    def initialize(self) -> None:
         pass
 
-    def rebuild(self):
+    def rebuild(self) -> None:
         pass
 
-    def reset(self):
+    def reset(self) -> None:
         pass
 
-    def get_state(self):
+    def get_state(self) -> int:
         return self.state
 
     def get(self, source=None, indicator=None):
@@ -711,17 +750,19 @@ class BaseFT(object):
     def get_all(self, source=None):
         raise NotImplementedError('%s: get_all - not implemented' % self.name)
 
-    def get_range(self, source=None, index=None, from_key=None, to_key=None):
+    def get_range(self, source: Optional[str]=None, index: Optional[str]=None,
+                from_key: Union[None, str, int]=None,
+                to_key: Union[None, str, int]=None) -> None:
         raise NotImplementedError('%s: get_range - not implemented' %
                                   self.name)
 
-    def length(self, source=None):
+    def length(self, source: Optional[str]=None) -> int:
         raise NotImplementedError('%s: length - not implemented' % self.name)
 
-    def hup(self, source=None):
+    def hup(self, source: Optional[str]=None) -> None:
         raise NotImplementedError('%s: hup - not implemented' % self.name)
 
-    def trace(self, action, indicator, **kwargs):
+    def trace(self, action: str, indicator: str, **kwargs) -> None:
         if self.state not in [ft_states.STARTED, ft_states.CHECKPOINT]:
             LOG.debug(
                 "%s - trace called in wrong state %s",
@@ -742,7 +783,7 @@ class BaseFT(object):
             value=trace
         )
 
-    def start(self):
+    def start(self) -> None:
         LOG.debug("%s - start called", self.name)
 
         if self.state != ft_states.INIT:
@@ -751,7 +792,7 @@ class BaseFT(object):
 
         self.state = ft_states.STARTED
 
-    def stop(self):
+    def stop(self) -> None:
         LOG.debug("%s - stop called", self.name)
 
         if self._disable_full_trace_glet is not None:
@@ -767,7 +808,7 @@ class BaseFT(object):
         self.state = ft_states.STOPPED
 
     @staticmethod
-    def gc(name, config=None):
+    def gc(name: str, config: Optional[dict]=None) -> None:
         try:
             os.remove('{}.chkp'.format(name))
         except:

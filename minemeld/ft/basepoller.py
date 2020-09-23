@@ -23,6 +23,11 @@ import random
 import collections
 import sys
 import shutil
+from typing import (
+    Optional, Union, List,
+    Iterator, Tuple, Any,
+    Iterable
+)
 
 import gevent
 import gevent.event
@@ -41,19 +46,19 @@ _MAX_AGE_OUT = ((1 << 32)-1)*1000  # 2106-02-07 6:28:15
 
 
 class _BaseBPTable(object):
-    def __init__(self, table):
-        self.table = table
+    def __init__(self, table: Table):
+        self.table: Table = table
 
-    def get(self, indicator, itype=None):
+    def get(self, indicator: str, itype: Optional[str]=None) -> Union[None, dict, str]:
         return self.table.get(indicator)
 
-    def delete(self, indicator, itype=None):
+    def delete(self, indicator: str, itype: Optional[str]=None):
         self.table.delete(indicator)
 
-    def put(self, indicator, value):
+    def put(self, indicator: str, value: dict):
         self.table.put(indicator, value)
 
-    def query(self, *args, **kwargs):
+    def query(self, *args, **kwargs) -> Iterator[Tuple[str, Optional[Union[None, dict, str]]]]:
         return self.table.query(*args, **kwargs)
 
     def length(self):
@@ -76,7 +81,7 @@ class _BPTable_v0(_BaseBPTable):
 
 
 class _BPTable_v1(_BaseBPTable):
-    def __init__(self, table, type_in_key):
+    def __init__(self, table: Table, type_in_key: bool):
         super(_BPTable_v1, self).__init__(table)
 
         self.table.create_index('_age_out')
@@ -93,26 +98,26 @@ class _BPTable_v1(_BaseBPTable):
             if cmetadata.get('type_in_key', None) != self.type_in_key:
                 raise RuntimeError('Can\'t change type in key of an existing table')
 
-    def get(self, indicator, itype=None):
+    def get(self, indicator: str, itype: Optional[str]=None) -> Union[None, dict, str]:
         if self.type_in_key:
             indicator = self._type_key(indicator, itype)
 
         return self.table.get(indicator)
 
-    def delete(self, indicator, itype=None):
+    def delete(self, indicator: str, itype: Optional[str]=None) -> None:
         if self.type_in_key:
             indicator = self._type_key(indicator, itype)
 
         return self.table.delete(indicator)
 
-    def put(self, indicator, value):
+    def put(self, indicator: str, value: dict) -> None:
         if self.type_in_key:
             itype = value.get('type', None)
             indicator = self._type_key(indicator, itype)
 
         return self.table.put(indicator, value)
 
-    def query(self, *args, **kwargs):
+    def query(self, *args, **kwargs) -> Iterator[Tuple[str, Optional[Union[None, dict, str]]]]:
         if not self.type_in_key:
             return self.table.query(*args, **kwargs)
 
@@ -129,17 +134,17 @@ class _BPTable_v1(_BaseBPTable):
         for key, value in self.table.query(*args, **kwargs):
             yield self._type_key_indicator(key), value
 
-    def _type_key(self, indicator, itype):
+    def _type_key(self, indicator: str, itype: Optional[str]) -> str:
         if itype is None:
             raise RuntimeError('Type None in table with type in key')
 
         return '{}::{}'.format(itype, indicator)
 
-    def _type_key_indicator(self, key):
+    def _type_key_indicator(self, key: str) -> str:
         return key.split('::', 1)[1]
 
 
-def _bptable_factory(name, truncate=False, type_in_key=False):
+def _bptable_factory(name: str, truncate: bool=False, type_in_key: bool=False) -> Union[_BPTable_v0, _BPTable_v1]:
     table = Table(name, truncate=truncate)
 
     metadata = table.get_custom_metadata()
@@ -385,12 +390,12 @@ class BasePollerFT(base.BaseFT):
         self._saved_state_reset()
         self._initialize_table(truncate=True)
 
-    @base.BaseFT.state.setter
+    @base.BaseFT.state.setter # type: ignore
     def state(self, value):
         LOG.debug("%s - acquiring state write lock", self.name)
         self.state_lock.lock()
         #  this is weird ! from stackoverflow 10810369
-        super(BasePollerFT, self.__class__).state.fset(self, value)
+        super(BasePollerFT, self.__class__).state.fset(self, value) # pylint: disable=no-member
         self.state_lock.unlock()
         LOG.debug("%s - releasing state write lock", self.name)
 
@@ -991,3 +996,10 @@ class BasePollerFT(base.BaseFT):
         base.BaseFT.gc(name, config=config)
         shutil.rmtree(name, ignore_errors=True)
         shutil.rmtree('{}.aggregate-temp'.format(name), ignore_errors=True)
+
+    # Virtual Methods
+    def _process_item(self, item) -> Iterable[Tuple[str, dict]]:
+        raise NotImplementedError()
+
+    def _build_iterator(self, now: int) -> Iterator[Any]:
+        raise NotImplementedError()
