@@ -21,6 +21,10 @@ Nodes communicate using the fabric.
 
 import os
 import logging
+from typing import (
+    Dict, Optional, List,
+    Any, TYPE_CHECKING,
+)
 
 import gevent
 import gevent.queue
@@ -30,6 +34,9 @@ gevent.monkey.patch_all(thread=False, select=False)
 import minemeld.mgmtbus
 import minemeld.ft
 import minemeld.fabric
+
+if TYPE_CHECKING:
+    from minemeld.ft.base import BaseFT
 
 LOG = logging.getLogger(__name__)
 STATE_REPORT_INTERVAL = 10
@@ -44,10 +51,10 @@ class Chassis(object):
             class specific
         mgmtbusconfig (dict): config dictionary for mgmt bus
     """
-    def __init__(self, fabricclass, fabricconfig, mgmtbusconfig):
+    def __init__(self, fabricclass: str, fabricconfig: dict, mgmtbusconfig: dict) -> None:
         self.chassis_id = os.getpid()
 
-        self.fts = {}
+        self.fts: Dict[str, 'BaseFT'] = {}
         self.poweroff = gevent.event.AsyncResult()
 
         self.fabric_class = fabricclass
@@ -73,16 +80,16 @@ class Chassis(object):
         self.status_channel_queue = gevent.queue.Queue(maxsize=128)
         self.status_glet = None
 
-    def _dynamic_load(self, classname):
+    def _dynamic_load(self, classname: str) -> 'BaseFT':
         modname, classname = classname.rsplit('.', 1)
         imodule = __import__(modname, globals(), locals(), [classname])
         cls = getattr(imodule, classname)
         return cls
 
-    def get_ft(self, ftname):
+    def get_ft(self, ftname: str) -> Optional['BaseFT']:
         return self.fts.get(ftname, None)
 
-    def configure(self, config):
+    def configure(self, config: dict)-> None:
         """configures the chassis instance
 
         Args:
@@ -117,18 +124,18 @@ class Chassis(object):
             timeout=10
         )
 
-    def request_mgmtbus_channel(self, ft):
+    def request_mgmtbus_channel(self, ft: 'BaseFT') -> None:
         self.mgmtbus.request_channel(ft)
 
-    def request_rpc_channel(self, ftname, ft, allowed_methods=None):
+    def request_rpc_channel(self, ftname: str, ft: 'BaseFT', allowed_methods: Optional[List[str]]=None):
         if allowed_methods is None:
             allowed_methods = []
         self.fabric.request_rpc_channel(ftname, ft, allowed_methods)
 
-    def request_pub_channel(self, ftname):
+    def request_pub_channel(self, ftname: str) -> Any:
         return self.fabric.request_pub_channel(ftname)
 
-    def request_sub_channel(self, ftname, ft, subname, allowed_methods=None):
+    def request_sub_channel(self, ftname: str, ft: 'BaseFT', subname: str, allowed_methods: Optional[List[str]]=None):
         if allowed_methods is None:
             allowed_methods = []
         self.fabric.request_sub_channel(ftname, ft, subname, allowed_methods)
@@ -137,7 +144,7 @@ class Chassis(object):
         return self.fabric.send_rpc(sftname, dftname, method, params,
                                     block=block, timeout=timeout)
 
-    def _log_actor(self):
+    def _log_actor(self) -> None:
         while True:
             try:
                 params = self.log_channel_queue.get()
@@ -149,7 +156,7 @@ class Chassis(object):
             except Exception:
                 LOG.exception('Error sending log')
 
-    def log(self, timestamp, nodename, log_type, value):
+    def log(self, timestamp: int, nodename: str, log_type: str, value: dict) -> None:
         self.log_channel_queue.put({
             'timestamp': timestamp,
             'source': nodename,
@@ -157,7 +164,7 @@ class Chassis(object):
             'log': value
         })
 
-    def _status_actor(self):
+    def _status_actor(self) -> None:
         while True:
             try:
                 params = self.status_channel_queue.get()
@@ -168,32 +175,35 @@ class Chassis(object):
             except Exception:
                 LOG.exception('Error publishing status')
 
-    def publish_status(self, timestamp, nodename, status):
+    def publish_status(self, timestamp: int, nodename: str, status: dict) -> None:
         self.status_channel_queue.put({
             'timestamp': timestamp,
             'source': nodename,
             'status': status
         })
 
-    def fabric_failed(self):
+    def fabric_failed(self) -> None:
         self.stop()
 
-    def mgmtbus_failed(self):
+    def mgmtbus_failed(self) -> None:
         LOG.critical('chassis - mgmtbus failed')
         self.stop()
 
-    def mgmtbus_start(self):
+    def mgmtbus_start(self) -> str:
         LOG.info('chassis - start received from mgmtbus')
         self.start()
         return 'ok'
 
-    def fts_init(self):
+    def fts_init(self) -> bool:
         for ft in self.fts.values():
             if ft.get_state() < minemeld.ft.ft_states.INIT:
                 return False
         return True
 
-    def stop(self):
+    def sig_stop(self, signum: int, sigstack: Any) -> None:
+        gevent.spawn(self.stop)
+
+    def stop(self) -> None:
         LOG.info("chassis stop called")
 
         if self.log_glet is not None:
@@ -220,7 +230,7 @@ class Chassis(object):
         LOG.info('chassis - stopped')
         self.poweroff.set(value='stop')
 
-    def start(self):
+    def start(self) -> None:
         LOG.info("chassis start called")
 
         self.log_glet = gevent.spawn(self._log_actor)

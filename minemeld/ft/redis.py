@@ -17,25 +17,33 @@
 import logging
 import redis
 import os
-import ujson as json
+import json
+from typing import (
+    Optional, List,
+    TYPE_CHECKING
+)
 
 from . import base
 from . import actorbase
+
+if TYPE_CHECKING:
+    from minemeld.chassis import Chassis
+
 
 LOG = logging.getLogger(__name__)
 
 
 class RedisSet(actorbase.ActorBaseFT):
-    def __init__(self, name, chassis, config):
+    def __init__(self, name: str, chassis: 'Chassis', config: dict) -> None:
         self.redis_skey = name
         self.redis_skey_value = name+'.value'
         self.redis_skey_chkp = name+'.chkp'
 
-        self.SR = None
+        self.SR: Optional[redis.Redis] = None
 
         super(RedisSet, self).__init__(name, chassis, config)
 
-    def configure(self):
+    def configure(self) -> None:
         super(RedisSet, self).configure()
 
         self.redis_url = self.config.get('redis_url',
@@ -48,12 +56,13 @@ class RedisSet(actorbase.ActorBaseFT):
         self.store_value = self.config.get('store_value', False)
         self.max_entries = self.config.get('max_entries', 1000 * 1000)
 
-    def connect(self, inputs, output):
+    def connect(self, inputs: List[str], output: bool) -> None:
         output = False
         super(RedisSet, self).connect(inputs, output)
 
-    def read_checkpoint(self):
+    def read_checkpoint(self) -> None:
         self._connect_redis()
+        assert self.SR is not None
 
         self.last_checkpoint = None
 
@@ -61,22 +70,23 @@ class RedisSet(actorbase.ActorBaseFT):
             'class': (self.__class__.__module__+'.'+self.__class__.__name__),
             'config': self._original_config
         }
-        config = json.dumps(config, sort_keys=True)
+        json_config = json.dumps(config, sort_keys=True)
 
         try:
-            contents = self.SR.get(self.redis_skey_chkp)
-            if contents is None:
+            chkp_value = self.SR.get(self.redis_skey_chkp)
+            if chkp_value is None:
                 raise ValueError('{} - last checkpoint not found'.format(self.name))
+            decoded_contents = chkp_value.decode('utf-8')
 
-            if contents[0] == '{':
+            if decoded_contents[0] == '{':
                 # new format
-                contents = json.loads(contents)
+                contents = json.loads(decoded_contents)
                 self.last_checkpoint = contents['checkpoint']
                 saved_config = contents['config']
                 saved_state = contents['state']
 
             else:
-                self.last_checkpoint = contents
+                self.last_checkpoint = decoded_contents
                 saved_config = ''
                 saved_state = None
 
@@ -84,7 +94,7 @@ class RedisSet(actorbase.ActorBaseFT):
 
             # old_status is missing in old releases
             # stick to the old behavior
-            if saved_config and saved_config != config:
+            if saved_config and saved_config != json_config:
                 LOG.info(
                     '%s - saved config does not match new config',
                     self.name
@@ -104,8 +114,9 @@ class RedisSet(actorbase.ActorBaseFT):
             LOG.exception('{} - Error reading last checkpoint'.format(self.name))
             self.last_checkpoint = None
 
-    def create_checkpoint(self, value):
+    def create_checkpoint(self, value: str) -> None:
         self._connect_redis()
+        assert self.SR is not None
 
         config = {
             'class': (self.__class__.__module__+'.'+self.__class__.__name__),
@@ -120,11 +131,13 @@ class RedisSet(actorbase.ActorBaseFT):
 
         self.SR.set(self.redis_skey_chkp, json.dumps(contents))
 
-    def remove_checkpoint(self):
+    def remove_checkpoint(self) -> None:
         self._connect_redis()
+        assert self.SR is not None
+
         self.SR.delete(self.redis_skey_chkp)
 
-    def _connect_redis(self):
+    def _connect_redis(self) -> None:
         if self.SR is not None:
             return
 
@@ -132,20 +145,26 @@ class RedisSet(actorbase.ActorBaseFT):
             self.redis_url
         )
 
-    def initialize(self):
+    def initialize(self) -> None:
         self._connect_redis()
 
-    def rebuild(self):
+    def rebuild(self) -> None:
         self._connect_redis()
+        assert self.SR is not None
+
         self.SR.delete(self.redis_skey)
         self.SR.delete(self.redis_skey_value)
 
-    def reset(self):
+    def reset(self) -> None:
         self._connect_redis()
+        assert self.SR is not None
+
         self.SR.delete(self.redis_skey)
         self.SR.delete(self.redis_skey_value)
 
-    def _add_indicator(self, score, indicator, value):
+    def _add_indicator(self, score: int, indicator: str, value: dict) -> None:
+        assert self.SR is not None
+
         if self.length() >= self.max_entries:
             self.statistics['drop.overflow'] += 1
             return
@@ -161,7 +180,9 @@ class RedisSet(actorbase.ActorBaseFT):
 
         self.statistics['added'] += result
 
-    def _delete_indicator(self, indicator):
+    def _delete_indicator(self, indicator: str) -> None:
+        assert self.SR is not None
+
         with self.SR.pipeline() as p:
             p.multi()
 

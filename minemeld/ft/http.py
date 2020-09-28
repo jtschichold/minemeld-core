@@ -21,6 +21,10 @@ import requests
 import logging
 import re
 import itertools
+from typing import (
+    Iterable, Tuple, Optional,
+    Dict, Any,
+)
 
 from minemeld import __version__ as MM_VERSION
 
@@ -97,7 +101,7 @@ class HttpFT(basepoller.BasePollerFT):
         chassis (object): parent chassis instance
         config (dict): node config.
     """
-    def configure(self):
+    def configure(self) -> None:
         super(HttpFT, self).configure()
 
         self.url = self.config.get('url', None)
@@ -113,7 +117,7 @@ class HttpFT(basepoller.BasePollerFT):
         if self.ignore_regex is not None:
             self.ignore_regex = re.compile(self.ignore_regex)
 
-        self.indicator = self.config.get('indicator', None)
+        self.indicator: Optional[Dict[str,Any]] = self.config.get('indicator', None)
 
         if self.indicator is not None:
             if 'regex' in self.indicator:
@@ -142,20 +146,20 @@ class HttpFT(basepoller.BasePollerFT):
                                 self.name, f)
                 fattrs['transform'] = '\g<0>'
 
-    def _process_item(self, line):
+    def _process_item(self, line: str) -> Iterable[Tuple[Optional[str], Optional[dict]]]:
         line = line.strip()
         if not line:
-            return [[None, None]]
+            return [(None, None)]
 
         if self.indicator is None:
             indicator = line.split()[0]
 
         else:
-            indicator = self.indicator['regex'].search(line)
-            if indicator is None:
-                return [[None, None]]
+            indicator_match: re.Match = self.indicator['regex'].search(line)
+            if indicator_match is None:
+                return [(None, None)]
 
-            indicator = indicator.expand(self.indicator['transform'])
+            indicator = indicator_match.expand(self.indicator['transform'])
 
         attributes = {}
         for f, fattrs in self.fields.items():
@@ -173,9 +177,9 @@ class HttpFT(basepoller.BasePollerFT):
             else:
                 attributes[f] = i
 
-        return [[indicator, attributes]]
+        return [(indicator, attributes)]
 
-    def _build_iterator(self, now):
+    def _build_iterator(self, now: int) -> Iterable[Any]:
         rkwargs = dict(
             stream=True,
             verify=self.verify_cert,

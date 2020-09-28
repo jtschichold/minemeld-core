@@ -80,7 +80,11 @@ import time
 import logging
 import shutil
 import gevent
-from typing import Optional, Union, Iterator, Tuple
+from typing import (
+    Optional, Union, Iterator,
+    Tuple, Protocol, ContextManager,
+    TYPE_CHECKING, TypeVar,
+)
 
 
 SCHEMAVERSION_KEY = struct.pack("B", 0)
@@ -92,6 +96,14 @@ TABLE_LAST_GLOBAL_ID = struct.pack("BB", 0, 4)
 CUSTOM_METADATA = struct.pack("BB", 0, 5)
 
 LOG = logging.getLogger(__name__)
+
+
+if TYPE_CHECKING:
+    class DbIteratorBB(Iterator[Tuple[bytes,bytes]],ContextManager[None]): # pylint: disable=duplicate-bases
+        pass
+
+    class DbIteratorB(Iterator[bytes],ContextManager[None]): # pylint: disable=duplicate-bases
+        pass
 
 
 class InvalidTableException(Exception):
@@ -147,12 +159,13 @@ class Table(object):
             raise InvalidTableException("Schema version not supported")
 
         self.indexes = {}
-        ri = self.db.iterator(
+        ri: 'DbIteratorBB' = self.db.iterator(
             start=START_INDEX_KEY,
             stop=END_INDEX_KEY
         )
         with ri:
             for k, v in ri:
+                LOG.info(f"Loading: {k!r} {v!r}")
                 _, _, indexid = struct.unpack("BBB", k)
                 if v in self.indexes:
                     raise InvalidTableException("2 indexes with the same name")
@@ -374,7 +387,7 @@ class Table(object):
         else:
             to_key = self._indicator_key(to_key)
 
-        ri = self.db.iterator(
+        ri: 'DbIteratorB' = self.db.iterator(
             start=from_key,
             stop=to_key,
             include_stop=include_stop,
@@ -385,10 +398,11 @@ class Table(object):
         with ri:
             for ekey in ri:
                 ekey = ekey[2:]
+                decoded_ekey = ekey.decode('utf8', 'ignore')
                 if include_value:
-                    yield ekey.decode('utf8', 'ignore'), self.get(ekey)
+                    yield decoded_ekey, self.get(decoded_ekey)
                 else:
-                    yield ekey.decode('utf8', 'ignore')
+                    yield decoded_ekey, None
 
     def _query_by_index(self, index: str, from_key: Union[str,int,None]=None, to_key: Union[str,int,None]=None,
                             include_value: bool=False, include_stop: bool=True,
@@ -415,7 +429,7 @@ class Table(object):
             )
 
         ldeleted = 0
-        ri = self.db.iterator(
+        ri: 'DbIteratorBB' = self.db.iterator(
             start=bfrom_key,
             stop=bto_key,
             include_value=True,
@@ -444,10 +458,11 @@ class Table(object):
                     ldeleted += 1
                     continue
 
+                decoded_ekey = ekey.decode('utf-8', 'ignore')
                 if include_value:
-                    yield ekey.decode('utf8', 'ignore'), self.get(ekey)
+                    yield decoded_ekey, self.get(decoded_ekey)
                 else:
-                    yield ekey.decode('utf8', 'ignore')
+                    yield decoded_ekey, None
 
         LOG.info('Deleted in scan of {}: {}'.format(index, ldeleted))
 
@@ -481,7 +496,7 @@ class Table(object):
 
         LOG.info('Loading indexes...')
         indexes = {}
-        ri = self.db.iterator(
+        ri: 'DbIteratorBB' = self.db.iterator(
             start=START_INDEX_KEY,
             stop=END_INDEX_KEY
         )

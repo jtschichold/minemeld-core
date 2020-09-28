@@ -35,6 +35,11 @@ import collections
 import time
 import hashlib
 import os
+from typing import (
+    Optional, Dict, Any,
+    Union, cast, Callable,
+    TYPE_CHECKING,
+)
 
 import gevent
 import gevent.event
@@ -46,6 +51,11 @@ import ujson
 
 import minemeld.comm
 import minemeld.ft
+
+if TYPE_CHECKING:
+    from minemeld.chassis import Chassis
+    from minemeld.ft.base import BaseFT
+    from minemeld.comm.zmqredis import ZMQPubChannel
 
 from .collectd import CollectdClient
 from .startupplanner import plan
@@ -474,21 +484,21 @@ class MgmtbusSlaveHub(object):
         comm_config (dict): config for the communication backend
     """
 
-    def __init__(self, config, comm_class, comm_config):
+    def __init__(self, config: str, comm_class: str, comm_config: dict) -> None:
         self.config = config
         self.comm_config = comm_config
         self.comm_class = comm_class
 
         self.comm = minemeld.comm.factory(self.comm_class, self.comm_config)
 
-    def request_log_channel(self):
+    def request_log_channel(self) -> 'ZMQPubChannel':
         LOG.debug("Adding log channel")
-        return self.comm.request_pub_channel(
+        return self.comm.request_pub_channel( # type: ignore # XXX - cast does not work on "strings"
             topic=MGMTBUS_LOG_TOPIC,
             multi_write=True
         )
 
-    def send_status(self, params):
+    def send_status(self, params: Dict[str, Union[str,int,bool]]) -> None:
         self.comm.send_rpc(
             dest=MGMTBUS_STATUS_TOPIC,
             method='status',
@@ -496,7 +506,7 @@ class MgmtbusSlaveHub(object):
             block=True
         )
 
-    def request_chassis_rpc_channel(self, chassis):
+    def request_chassis_rpc_channel(self, chassis: 'Chassis') -> None:
         self.comm.request_rpc_server_channel(
             '{}chassis:{}'.format(MGMTBUS_PREFIX, chassis.chassis_id),
             chassis,
@@ -507,7 +517,7 @@ class MgmtbusSlaveHub(object):
             fanout=MGMTBUS_CHASSIS_TOPIC
         )
 
-    def request_channel(self, node):
+    def request_channel(self, node: 'BaseFT') -> None:
         self.comm.request_rpc_server_channel(
             '{}directslave:{}'.format(MGMTBUS_PREFIX, node.name),
             node,
@@ -538,10 +548,10 @@ class MgmtbusSlaveHub(object):
             fanout=MGMTBUS_TOPIC
         )
 
-    def add_failure_listener(self, f):
+    def add_failure_listener(self, f: Callable[[], None]) -> None:
         self.comm.add_failure_listener(f)
 
-    def send_master_rpc(self, command, params=None, timeout=None):
+    def send_master_rpc(self, command: str, params: Optional[Dict[str,Union[int,bool,str]]]=None, timeout: Optional[int]=None) -> Optional[Any]:
         return self.comm.send_rpc(
             MGMTBUS_MASTER,
             command,
@@ -549,11 +559,11 @@ class MgmtbusSlaveHub(object):
             timeout=timeout
         )
 
-    def start(self):
+    def start(self) -> None:
         LOG.debug('mgmtbus start called')
         self.comm.start()
 
-    def stop(self):
+    def stop(self) -> None:
         self.comm.stop()
 
 
@@ -581,7 +591,7 @@ def master_factory(config, comm_class, comm_config, nodes, num_chassis):
     )
 
 
-def slave_hub_factory(config, comm_class, comm_config):
+def slave_hub_factory(config, comm_class: str, comm_config: dict) -> MgmtbusSlaveHub:
     """Factory of management bus slave hub instances
 
     Args:

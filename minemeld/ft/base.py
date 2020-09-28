@@ -23,7 +23,12 @@ import copy
 import os
 import collections
 import json
-from typing import Optional, Union, List, DefaultDict, Dict, Tuple
+from typing import (
+    Optional, Union, List,
+    DefaultDict, Dict, Tuple,
+    TypeVar, Callable, Any,
+    TYPE_CHECKING
+)
 
 import gevent
 
@@ -31,8 +36,12 @@ from . import condition
 from . import ft_states
 from . import utils
 
+if TYPE_CHECKING:
+    from minemeld.chassis import Chassis
 
 LOG = logging.getLogger(__name__)
+
+CountedF = TypeVar('CountedF', bound=Callable[..., Any])
 
 
 class _Filters(object):
@@ -115,7 +124,7 @@ class _Filters(object):
         return indicator, d
 
 
-def _counting(statsname):
+def _counting(statsname: str) -> Callable[[CountedF], CountedF]:
     """Decorator for counting calls to decorated instance methods.
     Counters are stored in statistics attribute of the instance.
 
@@ -191,7 +200,10 @@ class BaseFT(object):
         chassis (object): parent chassis instance
         config (dict): node config.
     """
-    def __init__(self, name: str, chassis, config):
+
+    last_checkpoint: Optional[str]
+
+    def __init__(self, name: str, chassis: 'Chassis', config: dict):
         self.name = name
 
         self.chassis = chassis
@@ -399,7 +411,7 @@ class BaseFT(object):
             value=value
         )
 
-    def do_rpc(self, dftname, method, block=True, timeout=30, **kwargs):
+    def do_rpc(self, dftname: str, method: str, block: bool=True, timeout: int=30, **kwargs) -> Any:
         return self.chassis.send_rpc(self.name, dftname, method, kwargs,
                                      block=block, timeout=timeout)
 

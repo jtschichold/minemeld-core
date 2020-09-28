@@ -52,7 +52,7 @@ def _run_chassis(fabricconfig, mgmtbusconfig, fts):
         )
         c.configure(fts)
 
-        gevent.signal.signal(signal.SIGUSR1, c.stop)
+        gevent.signal.signal(signal.SIGUSR1, c.sig_stop)
 
         while not c.fts_init():
             if c.poweroff.wait(timeout=0.1) is not None:
@@ -70,7 +70,7 @@ def _run_chassis(fabricconfig, mgmtbusconfig, fts):
             LOG.error("We should not be here !")
             c.stop()
 
-    except:
+    except Exception:
         LOG.exception('Exception in chassis main procedure')
         raise
 
@@ -159,10 +159,12 @@ def main():
             mbusmaster.checkpoint_graph()
 
         if processes_lock is None:
+            signal_received.set()
             return
 
         with processes_lock:
             if processes is None:
+                signal_received.set()
                 return
 
             for p in processes:
@@ -177,21 +179,20 @@ def main():
             while sum([int(t.is_alive()) for t in processes]) != 0:
                 gevent.sleep(1)
 
+        signal_received.set()
+
     def _sigint_handler(signum, sigstack):
         LOG.info('SIGINT received')
-        _cleanup()
-        signal_received.set()
+        gevent.spawn(_cleanup)
 
     def _sigterm_handler(signum, sigstack):
         LOG.info('SIGTERM received')
-        _cleanup()
-        signal_received.set()
+        gevent.spawn(_cleanup)
 
     def _disk_space_monitor(num_nodes):
         while True:
             if _check_disk_space(num_nodes=num_nodes) is None:
-                _cleanup()
-                signal_received.set()
+                gevent.spawn(_cleanup)
                 break
 
             gevent.sleep(60)

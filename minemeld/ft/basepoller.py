@@ -26,7 +26,7 @@ import shutil
 from typing import (
     Optional, Union, List,
     Iterator, Tuple, Any,
-    Iterable
+    Iterable, TYPE_CHECKING, DefaultDict
 )
 
 import gevent
@@ -39,6 +39,9 @@ from .table import Table
 from .utils import utc_millisec
 from .utils import RWLock
 from .utils import parse_age_out
+
+if TYPE_CHECKING:
+    from minemeld.chassis import Chassis
 
 LOG = logging.getLogger(__name__)
 
@@ -302,13 +305,13 @@ class BasePollerFT(base.BaseFT):
     _AGE_OUT_BASES = None
     _DEFAULT_AGE_OUT_BASE = None
 
-    def __init__(self, name, chassis, config):
-        self.table = None
-        self.agg_table = None
+    def __init__(self, name, chassis: 'Chassis', config: dict):
+        self.table: Union[None,_BPTable_v0,_BPTable_v1] = None
+        self.agg_table: Union[None,_BPTable_v0,_BPTable_v1] = None
 
         self._actor_queue = gevent.queue.Queue(maxsize=128)
         self._actor_glet = None
-        self._actor_commands_ts = collections.defaultdict(int)
+        self._actor_commands_ts: DefaultDict[str, int] = collections.defaultdict(int)
         self._poll_glet = None
         self._age_out_glet = None
         self._emit_counter = 0
@@ -325,12 +328,12 @@ class BasePollerFT(base.BaseFT):
 
         super(BasePollerFT, self).__init__(name, chassis, config)
 
-    def configure(self):
+    def configure(self) -> None:
         super(BasePollerFT, self).configure()
 
         self.source_name = self.config.get('source_name', self.name)
         self.attributes = self.config.get('attributes', {})
-        self.multiple_indicator_types = self.config.get('multiple_indicator_types', False)
+        self.multiple_indicator_types: bool = self.config.get('multiple_indicator_types', False)
         self.interval = self.config.get('interval', 3600)
         self.num_retries = self.config.get('num_retries', 2)
 
@@ -353,67 +356,70 @@ class BasePollerFT(base.BaseFT):
                 continue
             self.age_out[k] = parse_age_out(v)
 
-    def _saved_state_restore(self, saved_state):
+    def _saved_state_restore(self, saved_state: dict) -> None:
         self.last_run = saved_state.get('last_run', None)
         self.last_successful_run = saved_state.get(
             'last_successful_run',
             None
         )
 
-    def _saved_state_create(self):
+    def _saved_state_create(self) -> dict:
         return {
             'last_run': self.last_run,
             'last_successful_run': self.last_successful_run
         }
 
-    def _saved_state_reset(self):
+    def _saved_state_reset(self) -> None:
         self.last_successful_run = None
         self.last_run = None
 
-    def _initialize_table(self, truncate=False):
+    def _initialize_table(self, truncate: bool=False) -> None:
         self.table = _bptable_factory(
             self.name,
             truncate=truncate,
             type_in_key=self.multiple_indicator_types
         )
 
-    def initialize(self):
+    def initialize(self) -> None:
         self._initialize_table()
 
-    def rebuild(self):
+    def rebuild(self) -> None:
         self._actor_queue.put(
             (utc_millisec(), 'rebuild')
         )
         self._initialize_table(truncate=(self.last_checkpoint is None))
 
-    def reset(self):
+    def reset(self) -> None:
         self._saved_state_reset()
         self._initialize_table(truncate=True)
 
     @base.BaseFT.state.setter # type: ignore
-    def state(self, value):
+    def state(self, value: int):
         LOG.debug("%s - acquiring state write lock", self.name)
         self.state_lock.lock()
         #  this is weird ! from stackoverflow 10810369
-        super(BasePollerFT, self.__class__).state.fset(self, value) # pylint: disable=no-member
+        super(BasePollerFT, self.__class__).state.fset(self, value) # type: ignore # pylint: disable=no-member 
         self.state_lock.unlock()
         LOG.debug("%s - releasing state write lock", self.name)
 
-    def _controlled_emit_update(self, indicator, value):
+    def _controlled_emit_update(self, indicator: str, value: dict) -> None:
         self._emit_counter += 1
         if self._emit_counter == 15937:
             gevent.sleep(0.001)
             self._emit_counter = 0
         self.emit_update(indicator, value)
 
-    def _controlled_emit_withdraw(self, indicator, value):
+    def _controlled_emit_withdraw(self, indicator: str, value: dict) -> None:
         self._emit_counter += 1
         if self._emit_counter == 15937:
             gevent.sleep(0.001)
             self._emit_counter = 0
         self.emit_withdraw(indicator=indicator, value=value)
 
-    def _age_out(self):
+    def _age_out(self) -> None:
+        if self.table is None:
+            return
+
         with self.state_lock:
             if self.state != ft_states.STARTED:
                 return
@@ -426,6 +432,7 @@ class BasePollerFT(base.BaseFT):
                                              include_value=True):
                     LOG.debug('%s - %s %s aged out', self.name, i, v)
 
+                    assert isinstance(v, dict)
                     if v.get('_withdrawn', None) is not None:
                         continue
 
@@ -446,7 +453,10 @@ class BasePollerFT(base.BaseFT):
             except:
                 LOG.exception('Exception in _age_out')
 
-    def _flush(self):
+    def _flush(self) -> None:
+        if self.table is None:
+            return
+
         with self.state_lock:
             if self.state != ft_states.STARTED:
                 return
@@ -455,6 +465,7 @@ class BasePollerFT(base.BaseFT):
                 now = utc_millisec()
 
                 for i, v in self.table.query(include_value=True):
+                    assert isinstance(v, dict)
                     if v.get('_withdrawn', None) is not None:
                         continue
 
@@ -474,7 +485,7 @@ class BasePollerFT(base.BaseFT):
             except:
                 LOG.exception('Exception in _flush')
 
-    def _sudden_death(self):
+    def _sudden_death(self) -> None:
         if self.last_successful_run is None:
             return
 
@@ -493,7 +504,13 @@ class BasePollerFT(base.BaseFT):
                 self.table.put(i, v)
                 self.statistics['removed'] += 1
 
-    def _collect_garbage(self):
+    def _collect_garbage(self) -> None:
+        if self.table is None:
+            return
+
+        if self.last_successful_run is None:
+            return
+
         now = utc_millisec()
 
         with self.state_lock:
@@ -503,6 +520,7 @@ class BasePollerFT(base.BaseFT):
             for i, v in self.table.query(index='_withdrawn',
                                          to_key=now,
                                          include_value=True):
+                assert isinstance(v, dict)
                 if v.get('_last_run', 0) >= (self.last_successful_run-1):
                     continue
 
@@ -510,7 +528,7 @@ class BasePollerFT(base.BaseFT):
                 self.table.delete(i, itype=v.get('type', None))
                 self.statistics['garbage_collected'] += 1
 
-    def _compare_attributes(self, oa, na):
+    def _compare_attributes(self, oa: dict, na: dict) -> bool:
         default_attrs = ['sources', 'last_seen', 'first_seen']
         default_attrs.extend(list(self.attributes.keys()))
 
@@ -524,7 +542,7 @@ class BasePollerFT(base.BaseFT):
                 return False
         return True
 
-    def _update_attributes(self, current, _new, current_run, new_run):
+    def _update_attributes(self, current: dict, _new: dict, current_run, new_run) -> dict:
         x = {k:v for k,v in current.items() 
              if k in _new or
                 k in self.attributes or
@@ -534,7 +552,7 @@ class BasePollerFT(base.BaseFT):
 
         return x
 
-    def _aggregate_iterator(self, iterator):
+    def _aggregate_iterator(self, iterator: Iterable[Any]) -> bool:
         self.agg_table = _bptable_factory(
             '{}.aggregate-temp'.format(self.name),
             truncate=True,
@@ -566,15 +584,21 @@ class BasePollerFT(base.BaseFT):
                     continue
 
                 for indicator, attributes in ipairs:
+                    if indicator is None or attributes is None:
+                        continue
+
                     self.agg_table.put(indicator, attributes)
 
         return True
 
-    def _aggregate_process_item(self, item):
+    def _aggregate_process_item(self, item: Any) -> List[Any]:
         return [item]
 
-    def _polling_loop(self):
+    def _polling_loop(self) -> bool:
         LOG.info("Polling %s", self.name)
+
+        if self.table is None:
+            return False
 
         now = utc_millisec()
 
@@ -592,7 +616,7 @@ class BasePollerFT(base.BaseFT):
                 return False
 
         process_item = self._process_item
-        aggregation_exc = None
+        aggregation_exc: Union[Any, None] = None
         if self.aggregate_indicators:
             if self.agg_table is not None:
                 self.agg_table.close()
@@ -609,6 +633,7 @@ class BasePollerFT(base.BaseFT):
                 LOG.info('{} - Exception during aggregation, storing'.format(self.name))
                 aggregation_exc = sys.exc_info()
 
+            assert self.agg_table is not None
             process_item = self._aggregate_process_item
             iterator = self.agg_table.query(include_value=True)
 
@@ -635,6 +660,9 @@ class BasePollerFT(base.BaseFT):
                     if indicator is None:
                         LOG.debug('%s - indicator is None for item %s',
                                   self.name, item)
+                        continue
+
+                    if attributes is None:
                         continue
 
                     in_feed_threshold = self.last_successful_run
@@ -709,7 +737,7 @@ class BasePollerFT(base.BaseFT):
                         continue
 
         if self.agg_table is not None:
-            iterator.close()
+            # XXX - iterator.close()
             self.agg_table.close()
             self.agg_table = None
             shutil.rmtree('{}.aggregate-temp'.format(self.name))
@@ -720,7 +748,10 @@ class BasePollerFT(base.BaseFT):
 
         return True
 
-    def _rebuild(self):
+    def _rebuild(self) -> None:
+        if self.table is None:
+            return
+
         with self.state_lock:
             if self.state != ft_states.STARTED:
                 return
@@ -728,9 +759,13 @@ class BasePollerFT(base.BaseFT):
             self.sub_state = 'REBUILDING'
 
             for i, v in self.table.query(include_value=True):
+                assert isinstance(v, dict)
                 self._controlled_emit_update(i, v)
 
-    def _poll(self):
+    def _poll(self) -> None:
+        if self.table is None:
+            return
+
         tryn = 0
 
         while tryn < self.num_retries:
@@ -743,7 +778,7 @@ class BasePollerFT(base.BaseFT):
                 if performed:
                     self.last_successful_run = lastrun
 
-                _result = 'SUCCESS'
+                _result: Union[str, Tuple[str, str]] = 'SUCCESS'
                 break
 
             except gevent.GreenletExit:
@@ -771,7 +806,7 @@ class BasePollerFT(base.BaseFT):
         self.last_run = lastrun
         self.sub_state = _result
 
-    def _actor_loop(self):
+    def _actor_loop(self) -> None:
         while True:
             timestamp, command = self._actor_queue.get()
             LOG.info('%s - command: %d %s', self.name, timestamp, command)
@@ -817,7 +852,7 @@ class BasePollerFT(base.BaseFT):
 
             self._actor_commands_ts[command] = utc_millisec()
 
-    def _poll_loop(self):
+    def _poll_loop(self) -> None:
         # wait to poll until after the first ageout run
         while self.last_ageout_run is None:
             gevent.sleep(1)
@@ -865,7 +900,7 @@ class BasePollerFT(base.BaseFT):
             except gevent.GreenletExit:
                 break
 
-    def _age_out_loop(self):
+    def _age_out_loop(self) -> None:
         while True:
             with self.state_lock:
                 if self.state != ft_states.STARTED:
@@ -883,7 +918,7 @@ class BasePollerFT(base.BaseFT):
             except gevent.GreenletExit:
                 break
 
-    def _calc_age_out(self, indicator, attributes):
+    def _calc_age_out(self, indicator: str, attributes: dict) -> int:
         t = attributes.get('type', None)
         if t is None or t not in self.age_out:
             sel = self.age_out['default']
@@ -897,7 +932,7 @@ class BasePollerFT(base.BaseFT):
 
         return b + sel['offset']
 
-    def _huppable_wait(self, deltat):
+    def _huppable_wait(self, deltat: int) -> None:
         while deltat < 0:
             LOG.warning(
                 'Time for processing exceeded interval for %s',
@@ -911,7 +946,7 @@ class BasePollerFT(base.BaseFT):
             LOG.debug('%s - clearing poll event', self.name)
             self.poll_event.clear()
 
-    def mgmtbus_status(self):
+    def mgmtbus_status(self) -> dict:
         result = super(BasePollerFT, self).mgmtbus_status()
         result['last_run'] = self.last_run
         result['last_successful_run'] = self.last_successful_run
@@ -922,7 +957,7 @@ class BasePollerFT(base.BaseFT):
 
         return result
 
-    def mgmtbus_signal(self, source=None, signal=None, **kwargs):
+    def mgmtbus_signal(self, source: Optional[str]=None, signal: Optional[str]=None, **kwargs) -> None:
         if signal != 'flush':
             super(BasePollerFT, self).mgmtbus_signal(
                 source=source,
@@ -952,14 +987,17 @@ class BasePollerFT(base.BaseFT):
 
         self.publish_status(force=True)
 
-    def hup(self, source=None):
+    def hup(self, source: Optional[str]=None) -> None:
         LOG.info('%s - hup received, force polling', self.name)
         self.poll_event.set()
 
-    def length(self, source=None):
+    def length(self, source: Optional[str]=None) -> int:
+        if self.table is None:
+            return 0
+
         return self.table.length()
 
-    def start(self):
+    def start(self) -> None:
         super(BasePollerFT, self).start()
 
         if self._actor_glet is not None:
@@ -977,7 +1015,7 @@ class BasePollerFT(base.BaseFT):
             self._age_out_loop
         )
 
-    def stop(self):
+    def stop(self) -> None:
         super(BasePollerFT, self).stop()
 
         if self._actor_glet is None:
@@ -992,14 +1030,14 @@ class BasePollerFT(base.BaseFT):
         LOG.info("%s - # indicators: %d", self.name, self.table.length())
 
     @staticmethod
-    def gc(name, config=None):
+    def gc(name, config: Optional[dict]=None) -> None:
         base.BaseFT.gc(name, config=config)
         shutil.rmtree(name, ignore_errors=True)
         shutil.rmtree('{}.aggregate-temp'.format(name), ignore_errors=True)
 
     # Virtual Methods
-    def _process_item(self, item) -> Iterable[Tuple[str, dict]]:
+    def _process_item(self, item) -> Iterable[Tuple[Optional[str], Optional[dict]]]:
         raise NotImplementedError()
 
-    def _build_iterator(self, now: int) -> Iterator[Any]:
+    def _build_iterator(self, now: int) -> Iterable[Any]:
         raise NotImplementedError()

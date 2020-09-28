@@ -32,6 +32,9 @@ import struct
 import logging
 import shutil
 import array
+from typing import (
+    Iterator
+)
 
 LOG = logging.getLogger(__name__)
 
@@ -237,7 +240,7 @@ class ST(object):
         else:
             stop = self._endpoint_key(stop, level=MAX_LEVEL+1)
 
-        di = self.db.iterator(
+        di: Iterator[bytes] = self.db.iterator(
             start=start,
             stop=stop,
             reverse=reverse,

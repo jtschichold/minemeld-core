@@ -202,7 +202,7 @@ class MineMeldFTTableTests(unittest.TestCase):
 
         ok = 0
         rk = None
-        for k in table.query('a', from_key=0, to_key=1):
+        for k, _ in table.query('a', from_key=0, to_key=1):
             rk = k
             ok += 1
 

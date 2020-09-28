@@ -20,11 +20,17 @@ Each chassis has an instance of Fabric and nodes request connections to the
 fabric using this instance.
 """
 
-
-
 import logging
+from typing import (
+    List, Union, Dict,
+    TYPE_CHECKING
+)
 
 import minemeld.comm
+if TYPE_CHECKING:
+    from minemeld.comm.zmqredis import RedisPubChannel
+    from minemeld.chassis import Chassis
+    from minemeld.ft.base import BaseFT
 
 LOG = logging.getLogger(__name__)
 
@@ -37,7 +43,7 @@ class Fabric(object):
         config (dict): communication backend config
         comm_class (string): communication backend to be used
     """
-    def __init__(self, chassis, config, comm_class):
+    def __init__(self, chassis: 'Chassis', config: dict, comm_class: str) -> None:
         self.chassis = chassis
 
         self.comm_config = config
@@ -45,7 +51,7 @@ class Fabric(object):
 
         self.comm = minemeld.comm.factory(self.comm_class, self.comm_config)
 
-    def request_rpc_channel(self, ftname, node, allowed_methods):
+    def request_rpc_channel(self, ftname: str, node: 'BaseFT', allowed_methods: List[str]) -> None:
         """Creates a new RPC channel on the communication backend.
 
         Args:
@@ -55,15 +61,15 @@ class Fabric(object):
         """
         self.comm.request_rpc_server_channel(ftname, node, allowed_methods)
 
-    def request_pub_channel(self, ftname):
+    def request_pub_channel(self, ftname: str) -> 'RedisPubChannel':
         """Creates a new channel for publishing to a topic with name ftname.
 
         Args:
             ftname (str): node name
         """
-        return self.comm.request_pub_channel(ftname)
+        return self.comm.request_pub_channel(ftname) # type: ignore
 
-    def request_sub_channel(self, ftname, node, subname, allowed_methods):
+    def request_sub_channel(self, ftname: str, node: 'BaseFT', subname: str, allowed_methods: List[str]) -> None:
         """Creates a subscription channel to topic subname.
 
         Args:
@@ -75,8 +81,8 @@ class Fabric(object):
         _ = ftname  # noqa
         self.comm.request_sub_channel(subname, node, allowed_methods)
 
-    def send_rpc(self, sftname, dftname, method, params,
-                 block=True, timeout=None):
+    def send_rpc(self, sftname: str, dftname: str, method: str, params: Dict[str,Union[str,int,bool]],
+                 block: bool=True, timeout: int=None) -> None:
         """Sends a RPC command to a specific node.
 
         Args:
@@ -96,23 +102,23 @@ class Fabric(object):
             timeout=timeout
         )
 
-    def _comm_failure(self):
+    def _comm_failure(self) -> None:
         self.chassis.fabric_failed()
 
-    def start(self):
+    def start(self) -> None:
         LOG.debug("fabric start called")
         self.comm.add_failure_listener(self._comm_failure)
         self.comm.start(start_dispatching=False)
 
-    def start_dispatching(self):
+    def start_dispatching(self) -> None:
         self.comm.start_dispatching()
 
-    def stop(self):
+    def stop(self) -> None:
         LOG.debug("fabric stop called")
         self.comm.stop()
 
 
-def factory(classname, chassis, config):
+def factory(classname: str, chassis: 'Chassis', config: dict):
     """Factory for Fabric class.
 
     Args:
