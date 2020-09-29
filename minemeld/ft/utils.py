@@ -18,6 +18,9 @@ import functools
 import datetime
 import pytz
 import re
+from typing import (
+    Callable, Dict
+)
 
 import gevent
 import gevent.lock
@@ -84,7 +87,7 @@ def _merge_array(v1, v2):
     return v1
 
 
-RESERVED_ATTRIBUTES = {
+RESERVED_ATTRIBUTES: Dict[str,Callable] = {
     'sources': _merge_array,
     'first_seen': functools.partial(_merge_atomic_values, operator.gt),
     'last_seen': functools.partial(_merge_atomic_values, operator.lt),

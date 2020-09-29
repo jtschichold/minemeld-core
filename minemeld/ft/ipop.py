@@ -16,6 +16,12 @@ import logging
 import netaddr
 import uuid
 import shutil
+from typing import (
+    List, Union, Any,
+    Optional, Dict, Tuple,
+    Set, Iterable,
+    TYPE_CHECKING
+)
 
 from . import base
 from . import actorbase
@@ -24,16 +30,19 @@ from . import st
 from .utils import utc_millisec
 from .utils import RESERVED_ATTRIBUTES
 
+if TYPE_CHECKING:
+    from minemeld.chassis import Chassis
+
 LOG = logging.getLogger(__name__)
 
 WL_LEVEL = st.MAX_LEVEL
 
 
 class MWUpdate(object):
-    def __init__(self, start, end, uuids):
+    def __init__(self, start: int, end: int, uuids: Set[bytes]):
         self.start = start
         self.end = end
-        self.uuids = set(uuids)
+        self.uuids: Set[bytes] = set(uuids)
 
         s = netaddr.IPAddress(start)
         e = netaddr.IPAddress(end)
@@ -54,47 +63,45 @@ class MWUpdate(object):
 
 
 class AggregateIPv4FT(actorbase.ActorBaseFT):
-    def __init__(self, name, chassis, config):
-        self.active_requests = []
-
+    def __init__(self, name: str, chassis: 'Chassis', config: dict) -> None:
         super(AggregateIPv4FT, self).__init__(name, chassis, config)
 
-    def configure(self):
+    def configure(self) -> None:
         super(AggregateIPv4FT, self).configure()
 
         self.whitelist_prefixes = self.config.get('whitelist_prefixes', [])
         self.enable_list_merge = self.config.get('enable_list_merge', False)
 
-    def _initialize_tables(self, truncate=False):
-        self.table = table.Table(
+    def _initialize_tables(self, truncate: Optional[bool]=False) -> None:
+        self.table: table.Table = table.Table(
             self.name,
             bloom_filter_bits=10,
             truncate=truncate
         )
         self.table.create_index('_id')
-        self.st = st.ST(self.name+'_st', 32, truncate=truncate)
+        self.st: st.ST = st.ST(self.name+'_st', 32, truncate=truncate)
 
-    def initialize(self):
+    def initialize(self) -> None:
         self._initialize_tables()
 
-    def rebuild(self):
+    def rebuild(self) -> None:
         self._initialize_tables(truncate=True)
 
-    def reset(self):
+    def reset(self) -> None:
         self._initialize_tables(truncate=True)
 
-    def _indicator_key(self, indicator, source):
+    def _indicator_key(self, indicator: str, source: str) -> str:
         return indicator+'\x00'+source
 
-    def _calc_indicator_value(self, uuids, additional_uuid=None, additional_value=None):
-        mv = {'sources': []}
+    def _calc_indicator_value(self, uuids: Iterable[bytes], additional_uuid: Optional[str]=None, additional_value=None) -> Dict[str,Union[int,str,bool,list]]:
+        mv: Dict[str,Union[int,str,bool,list]] = {'sources': []}
         for uuid_ in uuids:
             if uuid_ == additional_uuid:
                 v = additional_value
             else:
                 # uuid_ = str(uuid.UUID(bytes=uuid_))
                 k, v = next(
-                    self.table.query('_id', from_key=uuid_, to_key=uuid_,
+                    self.table.query('_id', from_key=uuid_.decode('utf-8'), to_key=uuid_.decode('utf-8'),
                                      include_value=True),
                     (None, None)
                 )
@@ -104,19 +111,19 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
             for vk in v:
                 if vk in mv and vk in RESERVED_ATTRIBUTES:
                     mv[vk] = RESERVED_ATTRIBUTES[vk](mv[vk], v[vk])
-                else:
-                    if self.enable_list_merge and vk in mv and isinstance(mv[vk], list):
-                        if not isinstance(v[vk], list):
-                            mv[vk] = v[vk]
-                        else:
-                            mv[vk].extend(v[vk])
-                    else:
-                        mv[vk] = v[vk]
+                    continue
+
+                curr_mv = mv.get(vk, None)
+                if self.enable_list_merge and isinstance(curr_mv, list) and isinstance(v[vk], list):
+                    curr_mv.extend(v[vk])
+                    continue
+
+                mv[vk] = v[vk]
 
         return mv
 
-    def _merge_values(self, origin, ov, nv):
-        result = {'sources': []}
+    def _merge_values(self, origin: str, ov: dict, nv: dict) -> Dict[str,Union[str,int,bool,list]]:
+        result: Dict[str,Union[str,int,bool,list]] = {'sources': []}
 
         result['_added'] = ov['_added']
         result['_id'] = ov['_id']
@@ -126,7 +133,7 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
 
         return result
 
-    def _add_indicator(self, origin, indicator, value):
+    def _add_indicator(self, origin: str, indicator: str, value: Dict) -> Tuple[dict,bool]:
         added = False
 
         now = utc_millisec()
@@ -141,6 +148,7 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
             added = True
             self.statistics['added'] += 1
 
+        assert isinstance(v, dict)
         v = self._merge_values(origin, v, value)
         v['_updated'] = now
 
@@ -148,7 +156,7 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
 
         return v, added
 
-    def _calc_ipranges(self, start, end):
+    def _calc_ipranges(self, start: Optional[int], end: Optional[int]) -> Set[MWUpdate]:
         """Calc IP Ranges overlapping the range between start and end
         
         Args:
@@ -159,13 +167,13 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
             set: set of ranges
         """
 
-        result = set()
+        result: Set[MWUpdate] = set()
 
         # collect the endpoint between start and end
-        eps = set()
+        eps_set: Set[int] = set()
         for epaddr, _, _, _ in self.st.query_endpoints(start=start, stop=end):
-            eps.add(epaddr)
-        eps = sorted(eps)
+            eps_set.add(epaddr)
+        eps = sorted(eps_set)
 
         if len(eps) == 0:
             return result
@@ -174,7 +182,7 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
         # current level, active segments and segments levels
         oep = None
         oeplevel = -1
-        live_ids = set()
+        live_ids: Set[bytes] = set()
         slevels = {}
 
         for epaddr in eps:
@@ -224,7 +232,7 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
 
         return result
 
-    def _range_from_indicator(self, indicator):
+    def _range_from_indicator(self, indicator: str) -> Tuple[Optional[int],Optional[int]]:
         if '-' in indicator:
             start, end = [int(netaddr.IPAddress(x)) for x in indicator.split('-', 1)]
         elif '/' in indicator:
@@ -243,7 +251,7 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
 
         return start, end
 
-    def _endpoints_from_range(self, start, end):
+    def _endpoints_from_range(self, start: int, end: int) -> Tuple[Optional[int],Optional[int]]:
         """Return last endpoint before range and first endpoint after range
         
         Args:
@@ -254,30 +262,35 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
             tuple: (last endpoint before, first endpoint after)
         """
 
-        rangestart = next(
+        rangestart: Optional[int] = None
+        ep_start: Optional[Tuple[int,int,bool,bytes]] = next(
             self.st.query_endpoints(start=0, stop=max(start-1, 0),
                                     reverse=True),
             None
         )
-        if rangestart is not None:
-            rangestart = rangestart[0]
+        if ep_start is not None:
+            rangestart = ep_start[0]
         LOG.debug('%s - range start: %s', self.name, rangestart)
 
-        rangestop = next(
+        rangestop: Optional[int] = None
+        ep_stop: Optional[Tuple[int,int,bool,bytes]] = next(
             self.st.query_endpoints(reverse=False,
                                     start=min(end+1, self.st.max_endpoint),
                                     stop=self.st.max_endpoint,
                                     include_start=False),
             None
         )
-        if rangestop is not None:
-            rangestop = rangestop[0]
+        if ep_stop is not None:
+            rangestop = ep_stop[0]
         LOG.debug('%s - range stop: %s', self.name, rangestop)
 
         return rangestart, rangestop
 
     @base._counting('update.processed')
-    def filtered_update(self, source=None, indicator=None, value=None):
+    def filtered_update(self, source: Optional[str]=None, indicator: Optional[str]=None, value: Optional[Dict[str,Union[str,int,bool]]]=None) -> None:
+        if value is None or source is None or indicator is None:
+            return
+
         vtype = value.get('type', None)
         if vtype != 'IPv4':
             self.statistics['update.ignored'] += 1
@@ -300,7 +313,7 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
 
         rangestart, rangestop = self._endpoints_from_range(start, end)
 
-        rangesb = set(self._calc_ipranges(rangestart, rangestop))
+        rangesb: Set[MWUpdate] = set(self._calc_ipranges(rangestart, rangestop))
         LOG.debug('%s - ranges before update: %s', self.name, rangesb)
 
         if not newindicator and level != WL_LEVEL:
@@ -314,10 +327,10 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
         uuidbytes = v['_id'].encode('utf-8')
         self.st.put(uuidbytes, start, end, level=level)
 
-        rangesa = set(self._calc_ipranges(rangestart, rangestop))
+        rangesa: Set[MWUpdate] = set(self._calc_ipranges(rangestart, rangestop))
         LOG.debug('%s - ranges after update: %s', self.name, rangesa)
 
-        added = rangesa-rangesb
+        added: Set[MWUpdate] = rangesa-rangesb
         LOG.debug("%s - IP ranges added: %s", self.name, added)
 
         removed = rangesb-rangesa
@@ -345,8 +358,11 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
             )
 
     @base._counting('withdraw.processed')
-    def filtered_withdraw(self, source=None, indicator=None, value=None):
+    def filtered_withdraw(self, source: Optional[str]=None, indicator: Optional[str]=None, value: Optional[dict]=None):
         LOG.debug("%s - withdraw from %s - %s", self.name, source, indicator)
+
+        if source is None or indicator is None:
+            return
 
         if value is not None and value.get('type', None) != 'IPv4':
             self.statistics['withdraw.ignored'] += 1
@@ -358,6 +374,7 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
         LOG.debug("%s - v: %s", self.name, v)
         if v is None:
             return
+        assert isinstance(v, dict)
 
         self.table.delete(ik)
         self.statistics['removed'] += 1
@@ -414,7 +431,8 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
                 )
             )
 
-    def _send_indicators(self, source=None, from_key=None, to_key=None):
+    def _send_indicators(self, source: Optional[str]=None, from_key: Optional[int]=None, to_key: Optional[int]=None) -> None:
+        assert source is not None
         if from_key is None:
             from_key = 0
         if to_key is None:
@@ -462,22 +480,18 @@ class AggregateIPv4FT(actorbase.ActorBaseFT):
 
         return 'OK'
 
-    def length(self, source=None):
+    def length(self, source: Optional[str]=None) -> int:
         return self.table.num_indicators
 
-    def stop(self):
+    def stop(self) -> None:
         super(AggregateIPv4FT, self).stop()
-
-        for g in self.active_requests:
-            g.kill()
-        self.active_requests = []
 
         self.table.close()
 
         LOG.info("%s - # indicators: %d", self.name, self.table.num_indicators)
 
     @staticmethod
-    def gc(name, config=None):
+    def gc(name, config=None) -> None:
         actorbase.ActorBaseFT.gc(name, config=config)
 
         shutil.rmtree(name, ignore_errors=True)

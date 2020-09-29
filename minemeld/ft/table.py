@@ -83,6 +83,7 @@ import gevent
 from typing import (
     Optional, Union, Iterator,
     Tuple, Protocol, ContextManager,
+    Dict,
     TYPE_CHECKING, TypeVar,
 )
 
@@ -134,7 +135,7 @@ class Table(object):
 
     def _init_db(self) -> None:
         self.last_update = 0
-        self.indexes: dict = {}
+        self.indexes: Dict[str,dict] = {}
         self.num_indicators = 0
         self.last_global_id = 0
 
@@ -165,11 +166,11 @@ class Table(object):
         )
         with ri:
             for k, v in ri:
-                LOG.info(f"Loading: {k!r} {v!r}")
                 _, _, indexid = struct.unpack("BBB", k)
-                if v in self.indexes:
+                decoded_v = v.decode('utf-8')
+                if decoded_v in self.indexes:
                     raise InvalidTableException("2 indexes with the same name")
-                self.indexes[v] = {
+                self.indexes[decoded_v] = {
                     'id': indexid,
                     'last_global_id': 0
                 }
@@ -495,7 +496,7 @@ class Table(object):
         LOG.info('Upgrading from schema version 0 to schema version 1')
 
         LOG.info('Loading indexes...')
-        indexes = {}
+        indexes: Dict[str, dict] = {}
         ri: 'DbIteratorBB' = self.db.iterator(
             start=START_INDEX_KEY,
             stop=END_INDEX_KEY
@@ -503,9 +504,10 @@ class Table(object):
         with ri:
             for k, v in ri:
                 _, _, indexid = struct.unpack("BBB", k)
-                if v in indexes:
+                decoded_v = v.decode('utf-8')
+                if decoded_v in indexes:
                     raise InvalidTableException("2 indexes with the same name")
-                indexes[v] = {
+                indexes[decoded_v] = {
                     'id': indexid,
                     'last_global_id': 0
                 }

@@ -17,6 +17,11 @@ import json
 import re
 from collections import defaultdict
 from contextlib import contextmanager
+from typing import (
+    Union, Tuple, Callable,
+    Dict, Iterator, List,
+    Optional,
+)
 
 import unicodecsv
 from flask import request, jsonify, Response, stream_with_context
@@ -44,7 +49,7 @@ _IPV4_RANGE_RE = re.compile(
 BLUEPRINT = MMBlueprint('feeds', __name__, url_prefix='/feeds')
 
 
-def _translate_ip_ranges(indicator, value=None):
+def _translate_ip_ranges(indicator: str, value: Optional[dict]=None) -> List[str]:
     if value is not None and value['type'] != 'IPv4':
         return [indicator]
 
@@ -67,7 +72,7 @@ def _buffer():
         result.close()
 
 
-def generate_panosurl_feed(feed, start, num, desc, value, **kwargs):
+def generate_panosurl_feed(feed: str, start: int, num: int, desc: bool, value: str, **kwargs) -> Iterator[str]:
     zrange = SR.zrange
     if desc:
         zrange = SR.zrevrange
@@ -78,11 +83,13 @@ def generate_panosurl_feed(feed, start, num, desc, value, **kwargs):
     cstart = start
 
     while cstart < (start + num):
-        ilist = zrange(feed, cstart,
-                       cstart - 1 + min(start + num - cstart, FEED_INTERVAL))
+        ilist: List[bytes] = zrange(
+            feed, cstart,
+            cstart - 1 + min(start + num - cstart, FEED_INTERVAL)
+        )
 
-        for i in ilist:
-            i = i.lower()
+        for bi in ilist:
+            i = bi.decode('utf-8').lower()
 
             i = _PROTOCOL_RE.sub('', i)
 
@@ -123,7 +130,7 @@ def generate_panosurl_feed(feed, start, num, desc, value, **kwargs):
         cstart += 100
 
 
-def generate_plain_feed(feed, start, num, desc, value, **kwargs):
+def generate_plain_feed(feed: str, start: int, num: int, desc: bool, value: str, **kwargs) -> Iterator[str]:
     zrange = SR.zrange
     if desc:
         zrange = SR.zrevrange
@@ -136,13 +143,16 @@ def generate_plain_feed(feed, start, num, desc, value, **kwargs):
     cstart = start
 
     while cstart < (start + num):
-        ilist = zrange(feed, cstart,
-                       cstart - 1 + min(start + num - cstart, FEED_INTERVAL))
+        ilist: List[bytes] = zrange(
+            feed, cstart,
+            cstart - 1 + min(start + num - cstart, FEED_INTERVAL)
+        )
+        str_ilist: List[str] = [i.decode('utf-8') for i in ilist]
 
         if translate_ip_ranges:
-            ilist = [xi for i in ilist for xi in _translate_ip_ranges(i)]
+            str_ilist = [xi for i in str_ilist for xi in _translate_ip_ranges(i)]
 
-        yield '\n'.join(ilist) + '\n'
+        yield '\n'.join(str_ilist) + '\n'
 
         if len(ilist) < 100:
             break
@@ -419,13 +429,13 @@ def generate_bluecoat_feed(feed, start, num, desc, value, **kwargs):
         yield 'end\n'
 
 
-def generate_carbon_black(feed, start, num, desc, value, **kwargs):
+def generate_carbon_black(feed: str, start: int, num: int, desc: bool, value: str, **kwargs) -> Iterator[str]:
     zrange = SR.zrange
     ilist = zrange(feed, 0, (1 << 32) - 1)
     mm_to_cb = {"IPv4": "ipv4",
                 "domain": "dns",
                 "md5": "md5"}
-    ind_by_type = {"dns": [],
+    ind_by_type: Dict[str,list] = {"dns": [],
                    "md5": []}
 
     # Let's stream the information as soon as we have it
@@ -481,6 +491,7 @@ def generate_carbon_black(feed, start, num, desc, value, **kwargs):
         elif _IPV4_RANGE_RE.match(i):
             range_parts = i.split("-")
             ip_range = IPRange(range_parts[0], range_parts[1])
+        assert ip_range is not None
         for ip_addr in ip_range:
             if ipv4_line is not None:
                 yield ipv4_line + ","
@@ -491,7 +502,7 @@ def generate_carbon_black(feed, start, num, desc, value, **kwargs):
     yield "}}]}"
 
 
-_FEED_FORMATS = {
+_FEED_FORMATS: Dict[str,Dict] = {
     'json': {
         'formatter': generate_json_feed,
         'mimetype': 'application/json'
@@ -524,7 +535,7 @@ _FEED_FORMATS = {
 
 
 @BLUEPRINT.route('/<feed>', methods=['GET'], feeds=True, read_write=False)
-def get_feed_content(feed):
+def get_feed_content(feed: str) -> Union[Tuple[str,int],Response]:
     if not current_user.check_feed(feed):
         return '<html><body>Unauthorized</body></html>', 401
 

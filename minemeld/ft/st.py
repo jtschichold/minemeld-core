@@ -33,7 +33,8 @@ import logging
 import shutil
 import array
 from typing import (
-    Iterator
+    Iterator, Tuple, List,
+    Optional,
 )
 
 LOG = logging.getLogger(__name__)
@@ -44,8 +45,8 @@ TYPE_END = 0x1
 
 
 class ST(object):
-    def __init__(self, name, epsize, truncate=False,
-                 bloom_filter_bits=10, write_buffer_size=(4 << 20)):
+    def __init__(self, name: str, epsize: int, truncate: Optional[bool]=False,
+                 bloom_filter_bits: int=10, write_buffer_size: int=(4 << 20)) -> None:
         if truncate:
             try:
                 shutil.rmtree(name)
@@ -64,7 +65,7 @@ class ST(object):
         self.num_endpoints = 0
         self.num_segments = 0
 
-    def _split_interval(self, start, end, lower, upper):
+    def _split_interval(self, start: int, end: int, lower: int, upper: int) -> List[Tuple[int,int]]:
         if start <= lower and upper <= end:
             return [(lower, upper)]
 
@@ -78,7 +79,7 @@ class ST(object):
 
         return result
 
-    def _segment_key(self, start, end, uuid_=None, level=None):
+    def _segment_key(self, start: int, end: int, uuid_: Optional[bytes]=None, level: int=None) -> bytes:
         res = array.array('B', [
             1,
             (start >> 56) & 0xFF, (start >> 48) & 0xFF,
@@ -96,13 +97,13 @@ class ST(object):
             if uuid_ is not None:
                 res.extend(uuid_)
 
-        return res.tostring()
+        return res.tobytes()
 
-    def _split_segment_key(self, key):
+    def _split_segment_key(self, key: bytes) -> Tuple[int, int, int, bytes]:
         _, start, end, level = struct.unpack(">BQQB", key[:18])
         return start, end, level, key[18:]
 
-    def _endpoint_key(self, endpoint, level=None, type_=None, uuid_=None):
+    def _endpoint_key(self, endpoint: int, level: Optional[int]=None, type_: Optional[int]=None, uuid_: Optional[bytes]=None) -> bytes:
         res = array.array('B', [
             2,
             (endpoint >> 56) & 0xFF, (endpoint >> 48) & 0xFF,
@@ -118,17 +119,17 @@ class ST(object):
                 if uuid_ is not None:
                     res.extend(uuid_)
 
-        return res.tostring()
+        return res.tobytes()
 
-    def _split_endpoint_key(self, k):
+    def _split_endpoint_key(self, k: bytes) -> Tuple[int,int,bool,bytes]:
         _, endpoint, level, type_ = struct.unpack(">BQBB", k[:11])
         type_ = (True if type_ == TYPE_START else False)
         return endpoint, level, type_, k[11:]
 
-    def close(self):
+    def close(self) -> None:
         self.db.close()
 
-    def put(self, uuid_, start, end, level=0):
+    def put(self, uuid_: bytes, start: int, end: int, level: Optional[int]=0) -> None:
         si = self._split_interval(start, end, 0, self.max_endpoint)
 
         value = struct.pack(">QQ", start, end)
@@ -159,7 +160,7 @@ class ST(object):
         self.num_endpoints += 2
         self.num_segments += len(si)
 
-    def delete(self, uuid_, start, end, level=0):
+    def delete(self, uuid_: bytes, start: int, end: int, level: Optional[int]=0) -> None:
         batch = self.db.write_batch()
 
         si = self._split_interval(start, end, 0, self.max_endpoint)
@@ -187,7 +188,7 @@ class ST(object):
         self.num_endpoints -= 2
         self.num_segments -= len(si)
 
-    def cover(self, value):
+    def cover(self, value: int) -> Iterator[Tuple[bytes, int, int, int]]:
         """Iterate over segments covering value. Segment format:
         (uuid, level, start, end).
         
@@ -208,10 +209,14 @@ class ST(object):
             ks = self._segment_key(lower, upper)
             ke = self._segment_key(lower, upper, level=MAX_LEVEL+1)
 
+            k: bytes
+            v: bytes
             for k, v in self.db.iterator(start=ks, stop=ke, include_value=True,
                                          reverse=True, include_start=False,
                                          include_stop=False):
                 _, _, level, uuid_ = self._split_segment_key(k)
+                start: int
+                end: int
                 start, end = struct.unpack(">QQ", v)
 
                 yield uuid_, level, start, end
@@ -219,8 +224,8 @@ class ST(object):
             if lower == upper:
                 break
 
-    def query_endpoints(self, start=None, stop=None, reverse=False,
-                        include_start=True, include_stop=True):
+    def query_endpoints(self, start: Optional[int]=None, stop: Optional[int]=None, reverse=False,
+                        include_start=True, include_stop=True) -> Iterator[Tuple[int,int,bool,bytes]]:
         """Iterate over endpoints between start and end. endpoints have the
         format (endpoint, level, type, uuid). Type: 0 - start, 1 - end
 
@@ -232,17 +237,17 @@ class ST(object):
         """
 
         if start is None:
-            start = self._endpoint_key(0)
+            bstart = self._endpoint_key(0)
         else:
-            start = self._endpoint_key(start)
+            bstart = self._endpoint_key(start)
         if stop is None:
-            stop = self._endpoint_key(self.max_endpoint, level=MAX_LEVEL+1)
+            bstop = self._endpoint_key(self.max_endpoint, level=MAX_LEVEL+1)
         else:
-            stop = self._endpoint_key(stop, level=MAX_LEVEL+1)
+            bstop = self._endpoint_key(stop, level=MAX_LEVEL+1)
 
         di: Iterator[bytes] = self.db.iterator(
-            start=start,
-            stop=stop,
+            start=bstart,
+            stop=bstop,
             reverse=reverse,
             include_value=False,
             include_start=include_start,
