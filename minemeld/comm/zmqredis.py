@@ -159,56 +159,57 @@ class ZMQRpcFanoutClientChannel(object):
         self.active_rpcs: Dict[str, dict] = {}
 
     def run(self) -> None:
-        while True:
-            if self.reply_socket is None:
-                gevent.sleep(1)
-                continue
+        if self.reply_socket is None:
+            return
 
-            LOG.debug(
-                'RPC Fanout reply recving from {}:reply'.format(self.fanout))
-            body = self.reply_socket.recv_json()
-            LOG.debug('RPC Fanout reply from {}:reply recvd: {!r}'.format(
-                self.fanout, body))
-            self.reply_socket.send_string('OK')
-            LOG.debug(
-                'RPC Fanout reply from {}:reply recvd: {!r} - ok'.format(self.fanout, body))
+        LOG.debug(
+            'RPC Fanout reply recving from {}:reply'.format(self.fanout))
+        try:
+            body = self.reply_socket.recv_json(flags=zmq.NOBLOCK)
 
-            source = body.get('source', None)
-            if source is None:
-                LOG.error(
-                    'No source in reply in ZMQRpcFanoutClientChannel {}'.format(self.fanout))
-                continue
+        except zmq.ZMQError:
+            return
 
-            id_ = body.get('id', None)
-            if id_ is None:
-                LOG.error('No id in reply in ZMQRpcFanoutClientChannel {} from {}'.format(
-                    self.fanout, source))
-                continue
-            actreq = self.active_rpcs.get(id_, None)
-            if actreq is None:
-                LOG.error('Unknown id {} in reply in ZMQRpcFanoutClientChannel {} from {}'.format(
-                    id_, self.fanout, source))
-                continue
+        LOG.debug('RPC Fanout reply from {}:reply recvd: {!r}'.format(
+            self.fanout, body))
+        self.reply_socket.send_string('OK')
+        LOG.debug(
+            'RPC Fanout reply from {}:reply recvd: {!r} - ok'.format(self.fanout, body))
 
-            result = body.get('result', None)
-            if result is None:
-                actreq['errors'] += 1
-                errmsg = body.get('error', 'no error in reply')
-                LOG.error(
-                    'Error in RPC reply from {}: {}'.format(source, errmsg))
+        source = body.get('source', None)
+        if source is None:
+            LOG.error(
+                'No source in reply in ZMQRpcFanoutClientChannel {}'.format(self.fanout))
+            return
 
-            else:
-                actreq['answers'][source] = result
-            LOG.debug('RPC Fanout state: {!r}'.format(actreq))
+        id_ = body.get('id', None)
+        if id_ is None:
+            LOG.error('No id in reply in ZMQRpcFanoutClientChannel {} from {}'.format(
+                self.fanout, source))
+            return
+        actreq = self.active_rpcs.get(id_, None)
+        if actreq is None:
+            LOG.error('Unknown id {} in reply in ZMQRpcFanoutClientChannel {} from {}'.format(
+                id_, self.fanout, source))
+            return
 
-            if len(actreq['answers'])+actreq['errors'] >= actreq['num_results']:
-                actreq['event'].set({
-                    'answers': actreq['answers'],
-                    'errors': actreq['errors']
-                })
-                self.active_rpcs.pop(id_)
+        result = body.get('result', None)
+        if result is None:
+            actreq['errors'] += 1
+            errmsg = body.get('error', 'no error in reply')
+            LOG.error(
+                'Error in RPC reply from {}: {}'.format(source, errmsg))
 
-            gevent.sleep(0)
+        else:
+            actreq['answers'][source] = result
+        LOG.debug('RPC Fanout state: {!r}'.format(actreq))
+
+        if len(actreq['answers'])+actreq['errors'] >= actreq['num_results']:
+            actreq['event'].set({
+                'answers': actreq['answers'],
+                'errors': actreq['errors']
+            })
+            self.active_rpcs.pop(id_)
 
     def send_rpc(self, method: str, params: Optional[Dict[str, Union[str, int, bool]]] = None, num_results: int = 0, and_discard: bool = False) -> gevent.event.AsyncResult:
         if self.socket is None:
@@ -331,62 +332,67 @@ class ZMQRpcServerChannel(object):
             ])
 
     def run(self) -> None:
-        while True:
-            if self.socket is None:
-                LOG.error(
-                    f'Run called with invalid socket in RPC server channel: {self.name}')
-                gevent.sleep(1)
-                continue
+        if self.socket is None:
+            LOG.error(
+                f'Run called with invalid socket in RPC server channel: {self.name}')
+            gevent.sleep(1)
+            return
 
-            LOG.debug(f'RPC Server receiving from {self.name} - {self.fanout}')
-            toks = self.socket.recv_multipart()
-            LOG.debug(
-                'RPC Server recvd from {} - {}: {!r}'.format(self.name, self.fanout, toks))
+        LOG.debug(f'RPC Server receiving from {self.name} - {self.fanout}')
 
-            if self.fanout is not None:
-                reply_to, body = toks
-                reply_to = reply_to+b':reply'
-            else:
-                reply_to, _, body = toks
+        try:
+            toks = self.socket.recv_multipart(flags=zmq.NOBLOCK)
 
-            body = json.loads(body)
-            LOG.debug('RPC command to {}: {!r}'.format(self.name, body))
+        except zmq.ZMQError:
+            return
 
-            method = body.get('method', None)
-            id_ = body.get('id', None)
-            params = body.get('params', {})
+        LOG.debug(
+            'RPC Server recvd from {} - {}: {!r}'.format(self.name, self.fanout, toks))
 
-            if method is None:
-                LOG.error('No method in msg body')
-                return
-            if id_ is None:
-                LOG.error('No id in msg body')
-                return
+        if self.fanout is not None:
+            reply_to, body = toks
+            reply_to = reply_to+b':reply'
+        else:
+            reply_to, _, body = toks
 
-            method = self.method_prefix+method
+        body = json.loads(body)
+        LOG.debug('RPC command to {}: {!r}'.format(self.name, body))
 
-            if method not in self.allowed_methods:
-                LOG.error(
-                    f'Method not allowed in RPC server channel {self.name}: {method} {self.allowed_methods}')
-                self._send_result(reply_to, id_, error='Method not allowed')
+        method = body.get('method', None)
+        id_ = body.get('id', None)
+        params = body.get('params', {})
 
-            m = getattr(self.obj, method, None)
-            if m is None:
-                LOG.error('Method {} not defined in RPC server channel {}'.format(
-                    method, self.name))
-                self._send_result(reply_to, id_, error='Method not defined')
+        if method is None:
+            LOG.error('No method in msg body')
+            return
+        if id_ is None:
+            LOG.error('No id in msg body')
+            return
 
-            try:
-                result = m(**params)
+        method = self.method_prefix+method
 
-            except gevent.GreenletExit:
-                raise
+        if method not in self.allowed_methods:
+            LOG.error(
+                f'Method not allowed in RPC server channel {self.name}: {method} {self.allowed_methods}')
+            self._send_result(reply_to, id_, error='Method not allowed')
 
-            except Exception as e:
-                self._send_result(reply_to, id_, error=str(e))
+        m = getattr(self.obj, method, None)
+        if m is None:
+            LOG.error('Method {} not defined in RPC server channel {}'.format(
+                method, self.name))
+            self._send_result(reply_to, id_, error='Method not defined')
 
-            else:
-                self._send_result(reply_to, id_, result=result)
+        try:
+            result = m(**params)
+
+        except gevent.GreenletExit:
+            raise
+
+        except Exception as e:
+            self._send_result(reply_to, id_, error=str(e))
+
+        else:
+            self._send_result(reply_to, id_, result=result)
 
     def connect(self, context: zmq.Context) -> None:
         if self.socket is not None:
@@ -489,49 +495,53 @@ class ZMQSubChannel(object):
         self.socket: Optional[zmq.Socket] = None
 
     def run(self) -> None:
-        while True:
-            if self.socket is None:
-                LOG.error(
-                    'Run called with invalid socket in ZMQ Pub channel: {}'.format(self.name))
-                gevent.sleep(1)
-                continue
+        if self.socket is None:
+            LOG.error(
+                'Run called with invalid socket in ZMQ Pub channel: {}'.format(self.name))
+            gevent.sleep(1)
+            return
 
-            LOG.debug('ZMQPub {} receiving'.format(self.name))
-            body = self.socket.recv_json()
-            LOG.debug('ZMQPub {} recvd: {!r}'.format(self.name, body))
+        LOG.debug('ZMQPub {} receiving'.format(self.name))
+        try:
+            body = self.socket.recv_json(flags=zmq.NOBLOCK)
 
-            method = body.get('method', None)
-            id_ = body.get('id', None)
-            params = body.get('params', {})
+        except zmq.ZMQError:
+            return
 
-            if method is None:
-                LOG.error('No method in msg body')
-                return
-            if id_ is None:
-                LOG.error('No id in msg body')
-                return
+        LOG.debug('ZMQPub {} recvd: {!r}'.format(self.name, body))
 
-            method = self.method_prefix+method
+        method = body.get('method', None)
+        id_ = body.get('id', None)
+        params = body.get('params', {})
 
-            if method not in self.allowed_methods:
-                LOG.error(
-                    f'Method not allowed in RPC server channel {self.name}: {method} {self.allowed_methods}')
-                continue
+        if method is None:
+            LOG.error('No method in msg body')
+            return
+        if id_ is None:
+            LOG.error('No id in msg body')
+            return
 
-            m = getattr(self.obj, method, None)
-            if m is None:
-                LOG.error('Method {} not defined in RPC server channel {}'.format(
-                    method, self.name))
-                continue
+        method = self.method_prefix+method
 
-            try:
-                m(**params)
+        if method not in self.allowed_methods:
+            LOG.error(
+                f'Method not allowed in RPC server channel {self.name}: {method} {self.allowed_methods}')
+            return
 
-            except gevent.GreenletExit:
-                raise
+        m = getattr(self.obj, method, None)
+        if m is None:
+            LOG.error('Method {} not defined in RPC server channel {}'.format(
+                method, self.name))
+            return
 
-            except Exception:
-                LOG.exception('Exception in ZMQPub {}'.format(self.name))
+        try:
+            m(**params)
+
+        except gevent.GreenletExit:
+            raise
+
+        except Exception:
+            LOG.exception('Exception in ZMQPub {}'.format(self.name))
 
     def connect(self, context: zmq.Context) -> None:
         if self.socket is not None:
@@ -564,6 +574,9 @@ class RedisSubChannel(object):
         self.num_callbacks = 0
 
         self.sub_number: Optional[int] = None
+
+        self.counter: int = 0
+        self.subscribers_key = '{}:subscribers'.format(self.prefix)
 
     def _callback(self, msg: str) -> None:
         try:
@@ -598,6 +611,32 @@ class RedisSubChannel(object):
                           'with params %s', method, self.topic, params)
 
         self.num_callbacks += 1
+
+    def run(self, SR: redis.Redis) -> None:
+        base = self.counter & 0xfff
+        top = min(base + 127, 0xfff)
+
+        msgs = SR.lrange(
+            '{}:queue:{:013X}'.format(self.prefix, self.counter >> 12),
+            base,
+            top
+        )
+
+        for m in msgs:
+            LOG.debug('topic {} - {!r}'.format(
+                self.topic,
+                m
+            ))
+            self._callback(m)
+
+        self.counter += len(msgs)
+
+        if len(msgs) > 0:
+            SR.lset(
+                self.subscribers_key,
+                self.sub_number,
+                self.counter
+            )
 
     def connect(self) -> None:
         subscribers_key = '{}:subscribers'.format(self.prefix)
@@ -755,46 +794,64 @@ class ZMQRedis(object):
 
         return result
 
-    def _ioloop(self, executor: Union[ZMQRpcServerChannel, ZMQSubChannel, ZMQRpcFanoutClientChannel]):
-        executor.run()
+    # def _ioloop(self, executor: Union[ZMQRpcServerChannel, ZMQSubChannel, ZMQRpcFanoutClientChannel]):
+    #     executor.run()
 
-    def _sub_ioloop(self, schannel: RedisSubChannel) -> None:
-        LOG.debug('start draining messages on topic {}'.format(schannel.topic))
+    # def _sub_ioloop(self, schannel: RedisSubChannel) -> None:
+    #     LOG.debug('start draining messages on topic {}'.format(schannel.topic))
 
-        counter = 0
+    #     counter = 0
+    #     SR = redis.StrictRedis(connection_pool=self.redis_cp)
+    #     subscribers_key = '{}:subscribers'.format(schannel.prefix)
+
+    #     while True:
+    #         base = counter & 0xfff
+    #         top = min(base + 127, 0xfff)
+
+    #         msgs = SR.lrange(
+    #             '{}:queue:{:013X}'.format(schannel.prefix, counter >> 12),
+    #             base,
+    #             top
+    #         )
+
+    #         for m in msgs:
+    #             LOG.debug('topic {} - {!r}'.format(
+    #                 schannel.topic,
+    #                 m
+    #             ))
+    #             schannel._callback(m)
+
+    #         counter += len(msgs)
+
+    #         if len(msgs) > 0:
+    #             SR.lset(
+    #                 subscribers_key,
+    #                 schannel.sub_number,
+    #                 counter
+    #             )
+
+    #         if len(msgs) < (top - base + 1):
+    #             gevent.sleep(1.0)
+    #         else:
+    #             gevent.sleep(0)
+
+    def _ioloop(self) -> None:
         SR = redis.StrictRedis(connection_pool=self.redis_cp)
-        subscribers_key = '{}:subscribers'.format(schannel.prefix)
 
         while True:
-            base = counter & 0xfff
-            top = min(base + 127, 0xfff)
+            for rpcc in self.rpc_server_channels.values():
+                rpcc.run()
 
-            msgs = SR.lrange(
-                '{}:queue:{:013X}'.format(schannel.prefix, counter >> 12),
-                base,
-                top
-            )
+            for rfcc in self.rpc_fanout_clients_channels:
+                rfcc.run()
 
-            for m in msgs:
-                LOG.debug('topic {} - {!r}'.format(
-                    schannel.topic,
-                    m
-                ))
-                schannel._callback(m)
+            for mwschannel in self.mw_sub_channels:
+                mwschannel.run()
 
-            counter += len(msgs)
+            for schannel in self.sub_channels:
+                schannel.run(SR)
 
-            if len(msgs) > 0:
-                SR.lset(
-                    subscribers_key,
-                    schannel.sub_number,
-                    counter
-                )
-
-            if len(msgs) < (top - base + 1):
-                gevent.sleep(1.0)
-            else:
-                gevent.sleep(0)
+            gevent.sleep(0.01)
 
     def _ioloop_failure(self, g: gevent.Greenlet) -> None:
         LOG.error('_ioloop_failure')
@@ -835,25 +892,9 @@ class ZMQRedis(object):
             self.start_dispatching()
 
     def start_dispatching(self) -> None:
-        for rfcc in self.rpc_fanout_clients_channels:
-            g = gevent.spawn(self._ioloop, rfcc)
-            self.ioloops.append(g)
-            g.link_exception(self._ioloop_failure)
-
-        for rpcc in self.rpc_server_channels.values():
-            g = gevent.spawn(self._ioloop, rpcc)
-            self.ioloops.append(g)
-            g.link_exception(self._ioloop_failure)
-
-        for schannel in self.sub_channels:
-            g = gevent.spawn(self._sub_ioloop, schannel)
-            self.ioloops.append(g)
-            g.link_exception(self._ioloop_failure)
-
-        for mwschannel in self.mw_sub_channels:
-            g = gevent.spawn(self._ioloop, mwschannel)
-            self.ioloops.append(g)
-            g.link_exception(self._ioloop_failure)
+        g = gevent.spawn(self._ioloop)
+        self.ioloops.append(g)
+        g.link_exception(self._ioloop_failure)
 
     def stop(self) -> None:
         # kill ioloops

@@ -180,56 +180,6 @@ class AggregateFT(actorbase.ActorBaseFT):
                 else:
                     self.emit_withdraw(indicator, value=cvalue)
 
-    def get(self, source=None, indicator=None):
-        mv = {}
-        for s in self.inputs:
-            v = self.table.get(self._indicator_key(indicator, s))
-            if v is None:
-                continue
-
-            for k in v.keys():
-                if k in mv and k in RESERVED_ATTRIBUTES:
-                    mv[k] = RESERVED_ATTRIBUTES[k](mv[k], v[k])
-                else:
-                    mv[k] = v[k]
-
-        return mv
-
-    def get_all(self, source=None):
-        return self.get_range(source=source)
-
-    def get_range(self, source=None, index=None, from_key=None, to_key=None):
-        if index is not None:
-            raise ValueError("Index not found")
-
-        if to_key is not None:
-            to_key = self._indicator_key(to_key, '\x7F')
-
-        cindicator = None
-        cvalue = {}
-        for k, v in self.table.query(index=index, from_key=from_key,
-                                     to_key=to_key, include_value=True):
-            indicator, _ = k.split('\x00')
-            if indicator == cindicator:
-                for vk in v.keys():
-                    if vk in cvalue and vk in RESERVED_ATTRIBUTES:
-                        cvalue[vk] = RESERVED_ATTRIBUTES[vk](cvalue[vk], v[vk])
-                    else:
-                        cvalue[vk] = v[vk]
-
-            else:
-                if cindicator is not None:
-                    self.do_rpc(source, "update", indicator=cindicator,
-                                value=cvalue)
-                cindicator = indicator
-                cvalue = v
-
-        if cindicator is not None:
-            self.do_rpc(source, "update", indicator=cindicator,
-                        value=cvalue)
-
-        return 'OK'
-
     def length(self, source=None):
         return self.table.num_indicators
 

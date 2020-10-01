@@ -393,7 +393,7 @@ class MgmtbusMaster(object):
         self._status[nodename] = status
 
         try:
-            source = nodename.split(':', 2)[2]
+            source = nodename
             self.SR.publish(
                 'mm-engine-status.'+source,
                 ujson.dumps({
