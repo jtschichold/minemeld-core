@@ -39,7 +39,9 @@ __all__ = ['init_app', 'JOBS_MANAGER']
 
 REDIS_CP = redis.ConnectionPool.from_url(
     REDIS_URL,
-    max_connections=int(os.environ.get('REDIS_MAX_CONNECTIONS', 5))
+    max_connections=int(os.environ.get('REDIS_MAX_CONNECTIONS', 5)),
+    encoding="utf-8",
+    decode_responses=True
 )
 
 REDIS_JOBS_GROUP_PREFIX = 'mm-jobs-{}'
@@ -100,7 +102,8 @@ class JobsManager(object):
         )
         jobtempdir = tempfile.mkdtemp(prefix=jobname)
 
-        LOG.info('Executing job {} - {} cwd: {} logfile: {}'.format(jobname, args, jobtempdir, joblogfile))
+        LOG.info('Executing job {} - {} cwd: {} logfile: {}'.format(jobname,
+                                                                    args, jobtempdir, joblogfile))
 
         try:
             with open(joblogfile, 'w+') as logfile:
@@ -175,15 +178,18 @@ class JobsManager(object):
         jobdata = json.loads(jobdata)
         status = jobdata.get('status', None)
         if status != 'RUNNING':
-            LOG.info('Timeout for job {}-{} triggered but status not running'.format(prefix, jobid))
+            LOG.info(
+                'Timeout for job {}-{} triggered but status not running'.format(prefix, jobid))
             return
 
         pid = jobdata.get('pid', None)
         if pid is None:
-            LOG.error('Timeout for job {}-{} triggered but no pid available'.format(prefix, jobid))
+            LOG.error(
+                'Timeout for job {}-{} triggered but no pid available'.format(prefix, jobid))
             return
 
-        LOG.error('Timeout for job {}-{} triggered, sending TERM signal'.format(prefix, jobid))
+        LOG.error(
+            'Timeout for job {}-{} triggered, sending TERM signal'.format(prefix, jobid))
         os.kill(pid, signal.SIGTERM)
 
     def delete_job(self, job_group, jobid):
@@ -221,7 +227,8 @@ class JobsManager(object):
                 result[jobid] = jobdata
 
             except (ValueError, KeyError, psutil.ZombieProcess, psutil.AccessDenied):
-                LOG.error('Invalid job value - deleting job {}::{}'.format(job_group, jobid))
+                LOG.error(
+                    'Invalid job value - deleting job {}::{}'.format(job_group, jobid))
                 self.delete_job(job_group, jobid)
                 continue
 
@@ -244,9 +251,11 @@ class JobsManager(object):
 
         timeout_glet = None
         if timeout is not None:
-            timeout_glet = gevent.spawn(self._job_timeout_glet, job_group, jobid, timeout)
+            timeout_glet = gevent.spawn(
+                self._job_timeout_glet, job_group, jobid, timeout)
 
-        self.running_jobs[job_group][jobid] = _Job(glet=glet, timeout_glet=timeout_glet)
+        self.running_jobs[job_group][jobid] = _Job(
+            glet=glet, timeout_glet=timeout_glet)
 
         return jobid
 
@@ -254,7 +263,9 @@ class JobsManager(object):
 def get_JobsManager():
     jobsmgr = getattr(g, '_jobs_manager', None)
     if jobsmgr is None:
-        jobsmgr = JobsManager(connection_pool=REDIS_CP)
+        jobsmgr = JobsManager(
+            connection_pool=REDIS_CP
+        )
         g._jobs_manager = jobsmgr
     return jobsmgr
 

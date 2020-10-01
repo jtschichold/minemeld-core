@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 
-
 import sys
 import time
 import os
@@ -25,11 +24,33 @@ import json
 import multiprocessing
 import functools
 from collections import namedtuple
+from typing import (
+    TypedDict, List, Any,
+    Dict, Set, Optional,
+    Type, Tuple, TextIO,
+    NoReturn, Union
+)
 
 import yaml
 import gevent.core
 
 import minemeld.loader
+
+
+# Types
+TMineMeldNodeConfig = TypedDict('TMineMeldNodeConfig', {
+    'inputs': List[str],
+    'output': bool,
+    'prototype': str,
+    'class': str,
+    'config': Dict[str, Any]
+}, total=False)
+
+TMineMeldConfig = TypedDict('TMineMeldConfig', {
+    'fabric': Dict,
+    'mgmtbus': Dict,
+    'nodes': Dict[str, TMineMeldNodeConfig]
+}, total=False)
 
 
 __all__ = ['load_config', 'validate_config', 'resolve_prototypes']
@@ -80,7 +101,11 @@ class MineMeldConfigChange(_ConfigChange):
 
 
 class MineMeldConfig(_Config):
-    def as_nset(self):
+    nodes: Dict[str, TMineMeldNodeConfig]
+    fabric: Dict
+    mgmtbus: Dict
+
+    def as_nset(self) -> Set[str]:
         result = set()
         for nname, nvalue in self.nodes.items():
             result.add(
@@ -91,12 +116,13 @@ class MineMeldConfig(_Config):
             )
         return result
 
-    def compute_changes(self, oconfig):
+    def compute_changes(self, oconfig: Optional['MineMeldConfig']) -> None:
         if oconfig is None:
             # oconfig is None, mark everything as added
             for nodename, nodeattrs in self.nodes.items():
                 self.changes.append(
-                    MineMeldConfigChange(nodename=nodename, nodeclass=nodeattrs['class'], change=CHANGE_ADDED)
+                    MineMeldConfigChange(
+                        nodename=nodename, nodeclass=nodeattrs['class'], change=CHANGE_ADDED)
                 )
             return
 
@@ -174,7 +200,7 @@ class MineMeldConfig(_Config):
             self.changes.append(change)
 
     @classmethod
-    def from_dict(cls, dconfig=None):
+    def from_dict(cls: Type['MineMeldConfig'], dconfig: Optional[TMineMeldConfig] = None) -> 'MineMeldConfig':
         if dconfig is None:
             dconfig = {}
 
@@ -217,7 +243,7 @@ class MineMeldConfig(_Config):
         return cls(nodes=nodes, fabric=fabric, mgmtbus=mgmtbus, changes=[])
 
 
-def _load_node_prototype(protoname, paths):
+def _load_node_prototype(protoname: str, paths: List[str]) -> TMineMeldNodeConfig:
     proto_module, proto_name = protoname.rsplit('.', 1)
 
     pmodule = None
@@ -251,9 +277,9 @@ def _load_node_prototype(protoname, paths):
                        ' not found' % (protoname))
 
 
-def _load_config_from_file(f):
+def _load_config_from_file(f: TextIO) -> Tuple[bool, 'MineMeldConfig']:
     valid = True
-    config = yaml.safe_load(f)
+    config: Optional[TMineMeldConfig] = yaml.safe_load(f)
 
     if not isinstance(config, dict) and config is not None:
         raise ValueError('Invalid config YAML type')
@@ -261,7 +287,7 @@ def _load_config_from_file(f):
     return valid, MineMeldConfig.from_dict(config)
 
 
-def _load_and_validate_config_from_file(path):
+def _load_and_validate_config_from_file(path: str) -> Tuple[bool, Optional['MineMeldConfig']]:
     valid = False
     config = None
 
@@ -292,7 +318,7 @@ def _load_and_validate_config_from_file(path):
     return valid, config
 
 
-def _destroy_node(change, installed_nodes=None, installed_nodes_gcs=None):
+def _destroy_node(change: _ConfigChange, installed_nodes: Optional[Dict[str, Any]] = None, installed_nodes_gcs: Optional[Dict[str, Any]] = None) -> int:
     LOG.info('Destroying {!r}'.format(change))
 
     destroyed_name = change.nodename
@@ -303,9 +329,16 @@ def _destroy_node(change, installed_nodes=None, installed_nodes_gcs=None):
 
     # load node class GC from entry_point or from "gc" staticmethod of class
     node_gc = None
-    mmep = installed_nodes_gcs.get(destroyed_class, None)
+    mmep = None
+    if installed_nodes_gcs is not None:
+        mmep = installed_nodes_gcs.get(destroyed_class, None)
     if mmep is None:
-        mmep = installed_nodes.get(destroyed_class, None)
+        if installed_nodes is not None:
+            mmep = installed_nodes.get(destroyed_class, None)
+        if mmep is None:
+            LOG.error(
+                f"Could not find a entrypoint for {destroyed_name}:{destroyed_class}")
+            return 1
 
         try:
             nodep = mmep.ep.load()
@@ -313,12 +346,14 @@ def _destroy_node(change, installed_nodes=None, installed_nodes_gcs=None):
             if hasattr(nodep, 'gc'):
                 node_gc = nodep.gc
         except ImportError:
-            LOG.exception("Error checking node class {} for gc method".format(destroyed_class))
+            LOG.exception(
+                "Error checking node class {} for gc method".format(destroyed_class))
     else:
         try:
             node_gc = mmep.ep.load()
         except ImportError:
-            LOG.exception("Error resolving gc for class {}".format(destroyed_class))
+            LOG.exception(
+                "Error resolving gc for class {}".format(destroyed_class))
     if node_gc is None:
         LOG.error('Node {} with class {} with no garbage collector destroyed'.format(
             destroyed_name, destroyed_class
@@ -340,7 +375,7 @@ def _destroy_node(change, installed_nodes=None, installed_nodes_gcs=None):
     return 0
 
 
-def _destroy_old_nodes(config):
+def _destroy_old_nodes(config: 'MineMeldConfig') -> None:
     # this destroys resources used by destroyed nodes
     # a nodes has been destroyed if a node with same
     # name & config does not exist in the new config
@@ -352,9 +387,11 @@ def _destroy_old_nodes(config):
         return
 
     installed_nodes = minemeld.loader.map(minemeld.loader.MM_NODES_ENTRYPOINT)
-    installed_nodes_gcs = minemeld.loader.map(minemeld.loader.MM_NODES_GCS_ENTRYPOINT)
+    installed_nodes_gcs = minemeld.loader.map(
+        minemeld.loader.MM_NODES_GCS_ENTRYPOINT)
 
-    dpool = multiprocessing.Pool()
+    dpool: Optional[multiprocessing.pool.Pool] = multiprocessing.Pool()
+    assert dpool is not None
     _bound_destroy_node = functools.partial(
         _destroy_node,
         installed_nodes=installed_nodes,
@@ -369,7 +406,7 @@ def _destroy_old_nodes(config):
     dpool = None
 
 
-def _load_config_from_dir(path):
+def _load_config_from_dir(path: str) -> 'MineMeldConfig':
     ccpath = os.path.join(
         path,
         COMMITTED_CONFIG
@@ -393,10 +430,12 @@ def _load_config_from_dir(path):
         sys.exit(1)
 
     elif rcvalid and not ccvalid:
+        assert rcconfig is not None
         # running is valid but candidate is not
         return rcconfig
 
     elif not rcvalid and ccvalid:
+        assert cconfig is not None
         # candidate is valid while running is not
         LOG.info('Switching to candidate config')
         cconfig.compute_changes(rcconfig)
@@ -411,6 +450,8 @@ def _load_config_from_dir(path):
         return cconfig
 
     elif rcvalid and ccvalid:
+        assert cconfig is not None
+        assert rcconfig is not None
         LOG.info('Switching to candidate config')
         cconfig.compute_changes(rcconfig)
         LOG.info('Changes in config: {!r}'.format(cconfig.changes))
@@ -422,10 +463,12 @@ def _load_config_from_dir(path):
         shutil.copyfile(ccpath, rcpath)
         return cconfig
 
+    raise RuntimeError("We should not be here!!")
 
-def _detect_cycles(nodes):
+
+def _detect_cycles(nodes: Dict[str,TMineMeldNodeConfig]) -> bool:
     # using Topoligical Sorting to detect cycles in graph, see Wikipedia
-    graph = {}
+    graph: Dict[str,Dict[str,List[str]]] = {}
     S = set()
     L = []
 
@@ -441,9 +484,9 @@ def _detect_cycles(nodes):
                 graph[i]['outputs'].append(n)
                 graph[n]['inputs'].append(i)
 
-    for n, v in graph.items():
-        if len(v['inputs']) == 0:
-            S.add(n)
+    for gn, gv in graph.items():
+        if len(gv['inputs']) == 0:
+            S.add(gn)
 
     while len(S) != 0:
         n = S.pop()
@@ -456,25 +499,26 @@ def _detect_cycles(nodes):
         graph[n]['outputs'] = []
 
     nedges = 0
-    for n, v in graph.items():
-        nedges += len(v['inputs'])
-        nedges += len(v['outputs'])
+    for gn, gv in graph.items():
+        nedges += len(gv['inputs'])
+        nedges += len(gv['outputs'])
 
     return nedges == 0
 
 
-def resolve_prototypes(config):
+def resolve_prototypes(config: 'MineMeldConfig') -> bool:
     # retrieve prototype dir from environment
     # used for main library and local library
-    paths = os.getenv(PROTOTYPE_ENV, None)
-    if paths is None:
+    paths_list = os.getenv(PROTOTYPE_ENV, None)
+    if paths_list is None:
         raise RuntimeError('Unable to load prototypes: %s '
                            'environment variable not set' %
                            (PROTOTYPE_ENV))
-    paths = paths.split(':')
+    paths = paths_list.split(':')
 
     # add prototype dirs from extension to paths
-    prototypes_entrypoints = minemeld.loader.map(minemeld.loader.MM_PROTOTYPES_ENTRYPOINT)
+    prototypes_entrypoints = minemeld.loader.map(
+        minemeld.loader.MM_PROTOTYPES_ENTRYPOINT)
     for epname, mmep in prototypes_entrypoints.items():
         if not mmep.loadable:
             LOG.info('Prototypes entrypoint {} not loadable'.format(epname))
@@ -487,7 +531,8 @@ def resolve_prototypes(config):
 
         except:
             LOG.exception(
-                'Exception retrieving path from prototype entrypoint {}'.format(epname)
+                'Exception retrieving path from prototype entrypoint {}'.format(
+                    epname)
             )
 
     # resolve all prototypes
@@ -518,7 +563,7 @@ def resolve_prototypes(config):
     return valid
 
 
-def validate_config(config):
+def validate_config(config: 'MineMeldConfig') -> List[str]:
     result = []
 
     nodes = config.nodes
@@ -562,7 +607,7 @@ def validate_config(config):
     return result
 
 
-def load_config(config_path):
+def load_config(config_path: str) -> 'MineMeldConfig':
     if os.path.isdir(config_path):
         return _load_config_from_dir(config_path)
 
@@ -571,6 +616,7 @@ def load_config(config_path):
     valid, config = _load_and_validate_config_from_file(config_path)
     if not valid:
         raise RuntimeError('Invalid config')
+    assert config is not None
     config.compute_changes(None)
 
     return config

@@ -13,13 +13,12 @@
 #  limitations under the License.
 
 
-
 import logging
 import redis
 import os
 import json
 from typing import (
-    Optional, List,
+    Optional, List, Dict,
     TYPE_CHECKING
 )
 
@@ -47,8 +46,9 @@ class RedisSet(actorbase.ActorBaseFT):
         super(RedisSet, self).configure()
 
         self.redis_url = self.config.get('redis_url',
-            os.environ.get('REDIS_URL', 'unix:///var/run/redis/redis.sock')
-        )
+                                         os.environ.get(
+                                             'REDIS_URL', 'unix:///var/run/redis/redis.sock')
+                                         )
         self.scoring_attribute = self.config.get(
             'scoring_attribute',
             'last_seen'
@@ -70,27 +70,30 @@ class RedisSet(actorbase.ActorBaseFT):
             'class': (self.__class__.__module__+'.'+self.__class__.__name__),
             'config': self._original_config
         }
-        json_config = json.dumps(config, sort_keys=True)
+        json_config = json.dumps(
+            config, sort_keys=True, separators=(',', ': '), indent=None
+        )
 
         try:
-            chkp_value = self.SR.get(self.redis_skey_chkp)
+            chkp_value: str = self.SR.get(self.redis_skey_chkp)
             if chkp_value is None:
-                raise ValueError('{} - last checkpoint not found'.format(self.name))
-            decoded_contents = chkp_value.decode('utf-8')
+                raise ValueError(
+                    '{} - last checkpoint not found'.format(self.name))
 
-            if decoded_contents[0] == '{':
+            if chkp_value[0] == '{':
                 # new format
-                contents = json.loads(decoded_contents)
+                contents = json.loads(chkp_value)
                 self.last_checkpoint = contents['checkpoint']
                 saved_config = contents['config']
                 saved_state = contents['state']
 
             else:
-                self.last_checkpoint = decoded_contents
+                self.last_checkpoint = chkp_value
                 saved_config = ''
                 saved_state = None
 
-            LOG.debug('%s - restored checkpoint: %s', self.name, self.last_checkpoint)
+            LOG.debug('%s - restored checkpoint: %s',
+                      self.name, self.last_checkpoint)
 
             # old_status is missing in old releases
             # stick to the old behavior
@@ -111,7 +114,8 @@ class RedisSet(actorbase.ActorBaseFT):
                 self._saved_state_restore(saved_state)
 
         except (ValueError, IOError):
-            LOG.exception('{} - Error reading last checkpoint'.format(self.name))
+            LOG.exception(
+                '{} - Error reading last checkpoint'.format(self.name))
             self.last_checkpoint = None
 
     def create_checkpoint(self, value: str) -> None:
@@ -125,11 +129,12 @@ class RedisSet(actorbase.ActorBaseFT):
 
         contents = {
             'checkpoint': value,
-            'config': json.dumps(config, sort_keys=True),
+            'config': json.dumps(config, sort_keys=True, separators=(',', ': '), indent=None),
             'state': self._saved_state_create()
         }
 
-        self.SR.set(self.redis_skey_chkp, json.dumps(contents))
+        self.SR.set(self.redis_skey_chkp, json.dumps(
+            contents, sort_keys=True, separators=(',', ': '), indent=None))
 
     def remove_checkpoint(self) -> None:
         self._connect_redis()
@@ -142,7 +147,9 @@ class RedisSet(actorbase.ActorBaseFT):
             return
 
         self.SR = redis.StrictRedis.from_url(
-            self.redis_url
+            self.redis_url,
+            encoding="utf-8",
+            decode_responses=True
         )
 
     def initialize(self) -> None:
@@ -172,9 +179,12 @@ class RedisSet(actorbase.ActorBaseFT):
         with self.SR.pipeline() as p:
             p.multi()
 
-            p.zadd(self.redis_skey, score, indicator)
+            zadd_mapping: Dict[str, int] = {}
+            zadd_mapping[indicator] = score
+            p.zadd(self.redis_skey, zadd_mapping)
             if self.store_value:
-                p.hset(self.redis_skey_value, indicator, json.dumps(value))
+                p.hset(self.redis_skey_value, key=indicator,
+                       value=json.dumps(value, sort_keys=True, separators=(',', ': '), indent=None))
 
             result = p.execute()[0]
 
@@ -224,16 +234,21 @@ class RedisSet(actorbase.ActorBaseFT):
         redis_skey_value = '{}.value'.format(name)
         redis_skey_chkp = '{}.chkp'.format(name)
         redis_url = config.get('redis_url',
-            os.environ.get('REDIS_URL', 'unix:///var/run/redis/redis.sock')
-        )
+                               os.environ.get(
+                                   'REDIS_URL', 'unix:///var/run/redis/redis.sock')
+                               )
 
         cp = None
         try:
             cp = redis.ConnectionPool.from_url(
-                url=redis_url
+                redis_url,
+                encoding="utf-8",
+                decode_responses=True
             )
 
-            SR = redis.StrictRedis(connection_pool=cp)
+            SR = redis.StrictRedis(
+                connection_pool=cp
+            )
 
             SR.delete(redis_skey)
             SR.delete(redis_skey_value)

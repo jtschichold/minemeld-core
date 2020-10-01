@@ -20,7 +20,6 @@ This module implements ZMQ and Redis communication class for mgmtbus and fabric.
 """
 
 
-
 import logging
 import uuid
 import os
@@ -101,7 +100,8 @@ class RedisPubChannel(object):
         queues = self.SR.keys('{}:queue:*'.format(self.prefix))
         LOG.debug('topic {} - queues: {!r}'.format(self.topic, queues))
         queues = [q for q in queues if q < minqname]
-        LOG.debug('topic {} - queues to be deleted: {!r}'.format(self.topic, queues))
+        LOG.debug(
+            'topic {} - queues to be deleted: {!r}'.format(self.topic, queues))
         if len(queues) != 0:
             LOG.debug('topic {} - deleting {!r}'.format(
                 self.topic,
@@ -109,7 +109,7 @@ class RedisPubChannel(object):
             ))
             self.SR.delete(*queues)
 
-    def publish(self, method: str, params: Optional[Dict[str,Union[str,int,bool]]]=None) -> None:
+    def publish(self, method: str, params: Optional[Dict[str, Union[str, int, bool]]] = None) -> None:
         assert self.SR is not None
 
         high_bits = self.num_publish >> 12
@@ -164,31 +164,38 @@ class ZMQRpcFanoutClientChannel(object):
                 gevent.sleep(1)
                 continue
 
-            LOG.debug('RPC Fanout reply recving from {}:reply'.format(self.fanout))
+            LOG.debug(
+                'RPC Fanout reply recving from {}:reply'.format(self.fanout))
             body = self.reply_socket.recv_json()
-            LOG.debug('RPC Fanout reply from {}:reply recvd: {!r}'.format(self.fanout, body))
+            LOG.debug('RPC Fanout reply from {}:reply recvd: {!r}'.format(
+                self.fanout, body))
             self.reply_socket.send_string('OK')
-            LOG.debug('RPC Fanout reply from {}:reply recvd: {!r} - ok'.format(self.fanout, body))
+            LOG.debug(
+                'RPC Fanout reply from {}:reply recvd: {!r} - ok'.format(self.fanout, body))
 
             source = body.get('source', None)
             if source is None:
-                LOG.error('No source in reply in ZMQRpcFanoutClientChannel {}'.format(self.fanout))
+                LOG.error(
+                    'No source in reply in ZMQRpcFanoutClientChannel {}'.format(self.fanout))
                 continue
 
             id_ = body.get('id', None)
             if id_ is None:
-                LOG.error('No id in reply in ZMQRpcFanoutClientChannel {} from {}'.format(self.fanout, source))
+                LOG.error('No id in reply in ZMQRpcFanoutClientChannel {} from {}'.format(
+                    self.fanout, source))
                 continue
             actreq = self.active_rpcs.get(id_, None)
             if actreq is None:
-                LOG.error('Unknown id {} in reply in ZMQRpcFanoutClientChannel {} from {}'.format(id_, self.fanout, source))
+                LOG.error('Unknown id {} in reply in ZMQRpcFanoutClientChannel {} from {}'.format(
+                    id_, self.fanout, source))
                 continue
 
             result = body.get('result', None)
             if result is None:
                 actreq['errors'] += 1
                 errmsg = body.get('error', 'no error in reply')
-                LOG.error('Error in RPC reply from {}: {}'.format(source, errmsg))
+                LOG.error(
+                    'Error in RPC reply from {}: {}'.format(source, errmsg))
 
             else:
                 actreq['answers'][source] = result
@@ -203,7 +210,7 @@ class ZMQRpcFanoutClientChannel(object):
 
             gevent.sleep(0)
 
-    def send_rpc(self, method: str, params: Optional[Dict[str,Union[str,int,bool]]]=None, num_results: int=0, and_discard: bool=False) -> Any:
+    def send_rpc(self, method: str, params: Optional[Dict[str, Union[str, int, bool]]] = None, num_results: int = 0, and_discard: bool = False) -> gevent.event.AsyncResult:
         if self.socket is None:
             raise RuntimeError('Not connected')
 
@@ -237,12 +244,14 @@ class ZMQRpcFanoutClientChannel(object):
             'discard': and_discard
         }
 
-        LOG.debug('RPC Fanout Client: send multipart to {}: {!r}'.format(self.fanout, json.dumps(body)))
+        LOG.debug('RPC Fanout Client: send multipart to {}: {!r}'.format(
+            self.fanout, json.dumps(body)))
         self.socket.send_multipart([
             f'{self.fanout}'.encode('utf-8'),
             json.dumps(body).encode('utf-8')
         ])
-        LOG.debug('RPC Fanout Client: send multipart to {}: {!r} - done'.format(self.fanout, json.dumps(body)))
+        LOG.debug(
+            'RPC Fanout Client: send multipart to {}: {!r} - done'.format(self.fanout, json.dumps(body)))
 
         gevent.sleep(0)
 
@@ -258,7 +267,8 @@ class ZMQRpcFanoutClientChannel(object):
         self.socket.bind('ipc:///var/run/minemeld/{}'.format(self.fanout))
 
         self.reply_socket = context.socket(zmq.REP)
-        self.reply_socket.bind('ipc:///var/run/minemeld/{}:reply'.format(self.fanout))
+        self.reply_socket.bind(
+            'ipc:///var/run/minemeld/{}:reply'.format(self.fanout))
 
     def disconnect(self) -> None:
         if self.socket is not None:
@@ -272,8 +282,8 @@ class ZMQRpcFanoutClientChannel(object):
 
 
 class ZMQRpcServerChannel(object):
-    def __init__(self, name: str, obj: object, allowed_methods: Optional[List[str]]=None,
-                 method_prefix: str='', fanout: Optional[str]=None) -> None:
+    def __init__(self, name: str, obj: object, allowed_methods: Optional[List[str]] = None,
+                 method_prefix: str = '', fanout: Optional[str] = None) -> None:
         if allowed_methods is None:
             allowed_methods = []
 
@@ -287,7 +297,7 @@ class ZMQRpcServerChannel(object):
         self.context: Optional[zmq.Context] = None
         self.socket: Optional[zmq.Socket] = None
 
-    def _send_result(self, reply_to: bytes, id_: str, result: Optional[Any]=None, error: Optional[str]=None):
+    def _send_result(self, reply_to: bytes, id_: str, result: Optional[Any] = None, error: Optional[str] = None):
         assert self.context is not None
         assert self.socket is not None
 
@@ -300,13 +310,17 @@ class ZMQRpcServerChannel(object):
 
         if self.fanout is not None:
             reply_socket = self.context.socket(zmq.REQ)
-            reply_socket.connect('ipc:///var/run/minemeld/{}'.format(reply_to.decode('utf-8')))
-            LOG.debug('RPC Server {} result to {!r}: {!r}'.format(self.name, reply_to, ans))
+            reply_socket.connect(
+                'ipc:///var/run/minemeld/{}'.format(reply_to.decode('utf-8')))
+            LOG.debug('RPC Server {} result to {!r}: {!r}'.format(
+                self.name, reply_to, ans))
             reply_socket.send_json(ans, default=_bytes_serializer)
             reply_socket.recv()
-            LOG.debug('RPC Server {} result to {!r} - done'.format(self.name, reply_to))
+            LOG.debug(
+                'RPC Server {} result to {!r} - done'.format(self.name, reply_to))
             reply_socket.close(linger=0)
-            LOG.debug('RPC Server {} result to {!r} - closed'.format(self.name, reply_to))
+            LOG.debug(
+                'RPC Server {} result to {!r} - closed'.format(self.name, reply_to))
             reply_socket = None
 
         else:
@@ -319,13 +333,15 @@ class ZMQRpcServerChannel(object):
     def run(self) -> None:
         while True:
             if self.socket is None:
-                LOG.error(f'Run called with invalid socket in RPC server channel: {self.name}')
+                LOG.error(
+                    f'Run called with invalid socket in RPC server channel: {self.name}')
                 gevent.sleep(1)
                 continue
 
             LOG.debug(f'RPC Server receiving from {self.name} - {self.fanout}')
             toks = self.socket.recv_multipart()
-            LOG.debug('RPC Server recvd from {} - {}: {!r}'.format(self.name, self.fanout, toks))
+            LOG.debug(
+                'RPC Server recvd from {} - {}: {!r}'.format(self.name, self.fanout, toks))
 
             if self.fanout is not None:
                 reply_to, body = toks
@@ -350,12 +366,14 @@ class ZMQRpcServerChannel(object):
             method = self.method_prefix+method
 
             if method not in self.allowed_methods:
-                LOG.error('Method not allowed in RPC server channel {}: {}'.format(self.name, method))
+                LOG.error(
+                    f'Method not allowed in RPC server channel {self.name}: {method} {self.allowed_methods}')
                 self._send_result(reply_to, id_, error='Method not allowed')
 
             m = getattr(self.obj, method, None)
             if m is None:
-                LOG.error('Method {} not defined in RPC server channel {}'.format(method, self.name))
+                LOG.error('Method {} not defined in RPC server channel {}'.format(
+                    method, self.name))
                 self._send_result(reply_to, id_, error='Method not defined')
 
             try:
@@ -379,8 +397,10 @@ class ZMQRpcServerChannel(object):
         if self.fanout is not None:
             # we are subscribers
             self.socket = self.context.socket(zmq.SUB)
-            self.socket.connect('ipc:///var/run/minemeld/{}'.format(self.fanout))
-            self.socket.setsockopt(zmq.SUBSCRIBE, b'')  # set the filter to empty to recv all messages
+            self.socket.connect(
+                'ipc:///var/run/minemeld/{}'.format(self.fanout))
+            # set the filter to empty to recv all messages
+            self.socket.setsockopt(zmq.SUBSCRIBE, b'')
 
         else:
             # we are a router
@@ -409,7 +429,7 @@ class ZMQPubChannel(object):
         self.context: Optional[zmq.Context] = None
         self.topic = topic
 
-    def publish(self, method: str, params: Optional[Dict[str,Union[int,bool,str]]]=None) -> None:
+    def publish(self, method: str, params: Optional[Dict[str, Union[int, bool, str]]] = None) -> None:
         if self.socket is None:
             raise RuntimeError('Not connected')
 
@@ -453,8 +473,8 @@ class ZMQPubChannel(object):
 
 
 class ZMQSubChannel(object):
-    def __init__(self, name: str, obj: object, allowed_methods: Optional[List[str]]=None,
-                 method_prefix: str='', topic: Optional[str]=None):
+    def __init__(self, name: str, obj: object, allowed_methods: Optional[List[str]] = None,
+                 method_prefix: str = '', topic: Optional[str] = None):
         if allowed_methods is None:
             allowed_methods = []
 
@@ -471,7 +491,8 @@ class ZMQSubChannel(object):
     def run(self) -> None:
         while True:
             if self.socket is None:
-                LOG.error('Run called with invalid socket in ZMQ Pub channel: {}'.format(self.name))
+                LOG.error(
+                    'Run called with invalid socket in ZMQ Pub channel: {}'.format(self.name))
                 gevent.sleep(1)
                 continue
 
@@ -493,12 +514,14 @@ class ZMQSubChannel(object):
             method = self.method_prefix+method
 
             if method not in self.allowed_methods:
-                LOG.error('Method not allowed in RPC server channel {}: {}'.format(self.name, method))
+                LOG.error(
+                    f'Method not allowed in RPC server channel {self.name}: {method} {self.allowed_methods}')
                 continue
 
             m = getattr(self.obj, method, None)
             if m is None:
-                LOG.error('Method {} not defined in RPC server channel {}'.format(method, self.name))
+                LOG.error('Method {} not defined in RPC server channel {}'.format(
+                    method, self.name))
                 continue
 
             try:
@@ -518,7 +541,8 @@ class ZMQSubChannel(object):
 
         self.socket = self.context.socket(zmq.SUB)
         self.socket.connect('ipc:///var/run/minemeld/{}'.format(self.topic))
-        self.socket.setsockopt(zmq.SUBSCRIBE, b'')  # set the filter to empty to recv all messages
+        # set the filter to empty to recv all messages
+        self.socket.setsockopt(zmq.SUBSCRIBE, b'')
 
     def disconnect(self) -> None:
         if self.socket is not None:
@@ -528,7 +552,7 @@ class ZMQSubChannel(object):
 
 class RedisSubChannel(object):
     def __init__(self, topic: str, connection_pool: redis.ConnectionPool, object_: object,
-                 allowed_methods: List[str], name: Optional[str]=None) -> None:
+                 allowed_methods: List[str], name: Optional[str] = None) -> None:
         self.topic = topic
         self.prefix = 'mm:topic:{}'.format(self.topic)
         self.channel = None
@@ -587,7 +611,8 @@ class RedisSubChannel(object):
             0
         )
         self.sub_number -= 1
-        LOG.debug('Sub Number {} on {}'.format(self.sub_number, subscribers_key))
+        LOG.debug('Sub Number {} on {}'.format(
+            self.sub_number, subscribers_key))
 
     def disconnect(self) -> None:
         pass
@@ -619,8 +644,8 @@ class ZMQRedis(object):
     def add_failure_listener(self, listener: Callable[[], None]) -> None:
         self.failure_listeners.append(listener)
 
-    def request_rpc_server_channel(self, name: str, obj: Optional[object]=None, allowed_methods: Optional[List[str]]=None,
-                                   method_prefix: str='', fanout: Optional[str]=None) -> None:
+    def request_rpc_server_channel(self, name: str, obj: Optional[object] = None, allowed_methods: Optional[List[str]] = None,
+                                   method_prefix: str = '', fanout: Optional[str] = None) -> None:
         if allowed_methods is None:
             allowed_methods = []
 
@@ -640,7 +665,7 @@ class ZMQRedis(object):
         self.rpc_fanout_clients_channels.append(c)
         return c
 
-    def request_pub_channel(self, topic: str, multi_write: bool=False) -> Union[ZMQPubChannel, RedisPubChannel]:
+    def request_pub_channel(self, topic: str, multi_write: bool = False) -> Union[ZMQPubChannel, RedisPubChannel]:
         if not multi_write:
             redis_pub_channel = RedisPubChannel(
                 topic=topic,
@@ -652,7 +677,7 @@ class ZMQRedis(object):
 
         zmq_pub_channel = ZMQPubChannel(topic=topic)
         self.mw_pub_channels.append(zmq_pub_channel)
-        
+
         return zmq_pub_channel
 
     def request_sub_channel(self, topic, obj=None, allowed_methods=None,
@@ -680,8 +705,8 @@ class ZMQRedis(object):
         )
         self.mw_sub_channels.append(zmq_subchannel)
 
-    def send_rpc(self, dest: str, method: str, params: Optional[Dict[str,Union[str,int,bool]]],
-                 block: bool=True, timeout: Optional[int]=None) -> Optional[Any]:
+    def send_rpc(self, dest: str, method: str, params: Optional[Dict[str, Union[str, int, bool]]],
+                 block: bool = True, timeout: Optional[int] = None) -> Optional[Any]:
         if self.context is None:
             LOG.error('send_rpc to {} when not connected'.format(dest))
             return None
@@ -785,7 +810,7 @@ class ZMQRedis(object):
             for l in self.failure_listeners:
                 l()
 
-    def start(self, start_dispatching: bool=True) -> None:
+    def start(self, start_dispatching: bool = True) -> None:
         self.context = zmq.Context()
 
         for rfcc in self.rpc_fanout_clients_channels:

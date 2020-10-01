@@ -112,7 +112,10 @@ class RedisSessionInterface(flask.sessions.SessionInterface):
 def init_app(app, redis_url):
     redis_cp = redis.ConnectionPool.from_url(
         redis_url,
-        max_connections=int(os.environ.get('REDIS_SESSIONS_MAX_CONNECTIONS', 20))
+        max_connections=int(os.environ.get(
+            'REDIS_SESSIONS_MAX_CONNECTIONS', 20)),
+        encoding="utf-8",
+        decode_responses=True
     )
 
     app.session_interface = RedisSessionInterface(

@@ -46,7 +46,8 @@ def main():
     engine_process_name = os.environ.get('MM_ENGINE_PROCESSNAME', 'minemeld-engine')
 
     SR = redis.StrictRedis.from_url(
-        os.environ.get('REDIS_URL', 'unix:///var/run/redis/redis.sock')
+        os.environ.get('REDIS_URL', 'unix:///var/run/redis/redis.sock'),
+        encoding="utf-8", decode_responses=True
     )
 
     while True:

@@ -95,7 +95,7 @@ class Chassis(object):
         Args:
             config (list): list of FTs
         """
-        newfts = {}
+        newfts: Dict[str,'BaseFT'] = {}
         for ft in config:
             ftconfig = config[ft]
             LOG.debug(ftconfig)
@@ -125,7 +125,8 @@ class Chassis(object):
         )
 
     def request_mgmtbus_channel(self, ft: 'BaseFT') -> None:
-        self.mgmtbus.request_channel(ft)
+        pass
+        # self.mgmtbus.request_channel(ft)
 
     def request_rpc_channel(self, ftname: str, ft: 'BaseFT', allowed_methods: Optional[List[str]]=None):
         if allowed_methods is None:
@@ -185,18 +186,69 @@ class Chassis(object):
     def fabric_failed(self) -> None:
         self.stop()
 
+    def _nodes_rpc(self, command: str, target: Optional[str], **kwargs) -> Dict[str,Any]:
+        if target == "<chassis>" or target is None:
+            LOG.error(f"state_info received with target {target}")
+            return {}
+
+        nodes: Dict[str,'BaseFT'] = self.fts
+        if target != "<nodes>":
+            if target not in self.fts:
+                return {}
+
+            nodes = {}
+            nodes[target] = self.fts[target]
+
+        result: Dict[str,Any] = {}
+        for nodename, node in nodes.items():
+            m = getattr(node, command, None)
+            if m is None:
+                raise RuntimeError(f"{self.chassis_id} - method {command} not found for {nodename}")
+
+            result[nodename] = m(**kwargs)
+
+        return result
+
     def mgmtbus_failed(self) -> None:
         LOG.critical('chassis - mgmtbus failed')
         self.stop()
 
-    def mgmtbus_start(self) -> str:
+    def mgmtbus_start(self, target: Optional[str]=None) -> str:
+        if target != "<chassis>":
+            LOG.error(f"start received with target {target}")
+            return 'ok'
+
         LOG.info('chassis - start received from mgmtbus')
         self.start()
         return 'ok'
 
+    def mgmtbus_state_info(self, target: Optional[str]=None) -> Dict[str,dict]:
+        return self._nodes_rpc('mgmtbus_state_info',target)
+
+    def mgmtbus_initialize(self, target: Optional[str]=None) -> Dict[str,str]:
+        return self._nodes_rpc('mgmtbus_initialize',target)
+
+    def mgmtbus_rebuild(self, target: Optional[str]=None) -> Dict[str,str]:
+        return self._nodes_rpc('mgmtbus_rebuild',target)
+
+    def mgmtbus_reset(self, target: Optional[str]=None) -> Dict[str,str]:
+        return self._nodes_rpc('mgmtbus_reset',target)
+
+    def mgmtbus_status(self, target: Optional[str]=None) -> Dict[str,dict]:
+        return self._nodes_rpc('mgmtbus_status',target)
+
+    def mgmtbus_checkpoint(self, target: Optional[str]=None, value: Optional[str]=None) -> Dict[str,str]:
+        return self._nodes_rpc('mgmtbus_checkpoint', target, value=value)
+
+    def mgmtbus_hup(self, target: Optional[str]=None, source: Optional[str]=None) -> Dict[str,None]:
+        return self._nodes_rpc('mgmtbus_hup',target, source=source)
+
+    def mgmtbus_signal(self, target: Optional[str]=None, signal: Optional[str]=None, **kwargs) -> Dict[str,dict]:
+        return self._nodes_rpc('mgmtbus_signal',target)
+
     def fts_init(self) -> bool:
         for ft in self.fts.values():
-            if ft.get_state() < minemeld.ft.ft_states.INIT:
+            if ft.state < minemeld.ft.ft_states.INIT:
                 return False
         return True
 

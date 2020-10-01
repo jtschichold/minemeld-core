@@ -28,7 +28,6 @@ periodically retrieve metrics from all the nodes.
 """
 
 
-
 import logging
 import uuid
 import collections
@@ -38,6 +37,7 @@ import os
 from typing import (
     Optional, Dict, Any,
     Union, cast, Callable,
+    List, TypedDict,
     TYPE_CHECKING,
 )
 
@@ -56,6 +56,7 @@ if TYPE_CHECKING:
     from minemeld.chassis import Chassis
     from minemeld.ft.base import BaseFT
     from minemeld.comm.zmqredis import ZMQPubChannel
+    from minemeld.run.config import MineMeldConfig
 
 from .collectd import CollectdClient
 from .startupplanner import plan
@@ -70,6 +71,20 @@ MGMTBUS_LOG_TOPIC = MGMTBUS_PREFIX+'log'
 MGMTBUS_STATUS_TOPIC = MGMTBUS_PREFIX+'status'
 
 
+CommRpcResult = TypedDict('CommRpcResult', {
+    'answers': Dict[str,Any],
+    'errors': int
+}, total=False)
+
+
+class MgmtbusCmdTimeout(Exception):
+    pass
+
+
+class MgmtbusCmdError(Exception):
+    pass
+
+
 class MgmtbusMaster(object):
     """MineMeld engine management bus master
 
@@ -79,6 +94,7 @@ class MgmtbusMaster(object):
         comm_class (string): communication backend to be used
         comm_config (dict): config for the communication backend
     """
+
     def __init__(self, ftlist, config, comm_class, comm_config, num_chassis):
         super(MgmtbusMaster, self).__init__()
 
@@ -88,10 +104,10 @@ class MgmtbusMaster(object):
         self.comm_class = comm_class
         self.num_chassis = num_chassis
 
-        self._chassis = []
+        self._chassis: List[int] = []
         self._all_chassis_ready = gevent.event.Event()
 
-        self.graph_status = None
+        self.graph_status: Optional[str] = None
 
         self._start_timestamp = int(time.time())*1000
         self._status_lock = gevent.lock.Semaphore()
@@ -103,16 +119,16 @@ class MgmtbusMaster(object):
         )
 
         self.comm = minemeld.comm.factory(self.comm_class, self.comm_config)
-        self._out_channel = self.comm.request_pub_channel(MGMTBUS_TOPIC)
+        # self._out_channel = self.comm.request_pub_channel(MGMTBUS_TOPIC)
         self.comm.request_rpc_server_channel(
             name=MGMTBUS_MASTER,
             obj=self,
             allowed_methods=['rpc_status', 'rpc_chassis_ready'],
             method_prefix='rpc_'
         )
-        self._slaves_rpc_client = self.comm.request_rpc_fanout_client_channel(
-            MGMTBUS_TOPIC
-        )
+        # self._slaves_rpc_client = self.comm.request_rpc_fanout_client_channel(
+        #     MGMTBUS_TOPIC
+        # )
         self._chassis_rpc_client = self.comm.request_rpc_fanout_client_channel(
             MGMTBUS_CHASSIS_TOPIC
         )
@@ -127,11 +143,14 @@ class MgmtbusMaster(object):
         """
         return self._status
 
-    def rpc_chassis_ready(self, chassis_id=None):
+    def rpc_chassis_ready(self, chassis_id: Optional[int] = None) -> str:
         """Chassis signal ready state via this RPC
         """
         if chassis_id in self._chassis:
             LOG.error('duplicate chassis_id received in rpc_chassis_ready')
+            return 'ok'
+        if chassis_id is None:
+            LOG.error("chassis_ready message without chassis_id")
             return 'ok'
 
         self._chassis.append(chassis_id)
@@ -140,7 +159,7 @@ class MgmtbusMaster(object):
 
         return 'ok'
 
-    def wait_for_chassis(self, timeout=60):
+    def wait_for_chassis(self, timeout: int = 60) -> None:
         """Wait for all the chassis signal ready state
         """
         if self.num_chassis == 0:  # empty config
@@ -149,21 +168,21 @@ class MgmtbusMaster(object):
         if not self._all_chassis_ready.wait(timeout=timeout):
             raise RuntimeError('Timeout waiting for chassis')
 
-    def start_chassis(self):
+    def start_chassis(self) -> None:
         self._send_cmd_and_wait(
             'start',
-            to_slaves=False,  # chassis
+            '<chassis>',
             timeout=60
         )
 
-    def _send_cmd(self, command, to_slaves=True, params=None, and_discard=False):
+    def _send_cmd(self, command: str, target: str, params: Optional[Dict[str, Any]] = None, and_discard: bool = False) -> gevent.event.AsyncResult:
         """Sends command to slaves or chassis over mgmt bus.
 
         Args:
             command (str): command
             params (dict): params of the command
             and_discard (bool): discard answer, don't wait
-            to_slaves (bool): send command to nodes, otherwise to chassis
+            target (str): node name, or <nodes> for all nodes, or <chassis> for all chassis
 
         Returns:
             returns a gevent.event.AsyncResult that is signaled
@@ -171,71 +190,65 @@ class MgmtbusMaster(object):
         """
         if params is None:
             params = {}
+        params['target'] = target
 
-        rpc_client = self._slaves_rpc_client
-        num_results = len(self.ftlist)
-        if not to_slaves:
-            rpc_client = self._chassis_rpc_client
-            num_results = self.num_chassis
-
-        return rpc_client.send_rpc(
+        return self._chassis_rpc_client.send_rpc(
             command,
             params=params,
             and_discard=and_discard,
-            num_results=num_results
+            num_results=self.num_chassis
         )
 
-    def _send_cmd_and_wait(self, command, to_slaves=True, timeout=60):
+    def _send_cmd_and_wait(self, command: str, target: str, params: Optional[Dict[str, Any]] = None, timeout: int = 60) -> Dict[str,Any]:
         """Simple wrapper around _send_cmd for raising exceptions
         """
-        revt = self._send_cmd(command, to_slaves=to_slaves)
+        revt = self._send_cmd(command, target, params=params)
         success = revt.wait(timeout=timeout)
         if success is None:
-            LOG.critical('Timeout in {}'.format(command))
-            raise RuntimeError('Timeout in {}'.format(command))
-        result = revt.get(block=False)
+            LOG.critical(f'Timeout in {command} to {target}')
+            raise MgmtbusCmdTimeout(f'Timeout in {command} to {target}')
+
+        result: CommRpcResult = revt.get(block=False)
         if result['errors'] > 0:
-            LOG.critical('Errors reported in {}'.format(command))
-            raise RuntimeError('Errors reported in {}'.format(command))
+            LOG.critical(f'Errors reported in {command} to {target}')
+            raise MgmtbusCmdError(f'Errors reported in {command} to {target}')
 
-        return result
+        # if target is <nodes> we flatten the answers
+        ans = result.get('answers', {})
+        if target == "<nodes>":
+            ans = {nodename: nodeans for a in ans.values() for nodename,nodeans in a.items()}
 
-    def _send_node_cmd(self, nodename, command, params=None):
+        return ans
+
+    def _send_node_cmd(self, nodename: str, command: str, params: Dict[str, Any] = None) -> Any:
         """Send command to a single node
         """
         if params is None:
             params = {}
 
-        try:
-            result = self.comm.send_rpc(
-                dest='{}directslave:{}'.format(MGMTBUS_PREFIX, nodename),
-                method=command,
-                params=params,
-                timeout=60
-            )
-        except gevent.timeout.Timeout:
-            msg = 'Timeout in {} to node {}'.format(command, nodename)
-            LOG.error(msg)
-            raise RuntimeError(msg)
+        result = self._send_cmd_and_wait(
+            command,
+            nodename,
+            params=params,
+            timeout=60
+        )
 
-        if result.get('result', None) is None:
-            raise RuntimeError('Error in {} to node {}: {}'.format(
-                command, nodename, result.get('error', '<unknown>')
-            ))
+        return result
 
-        return result['result']
-
-    def init_graph(self, config):
+    def init_graph(self, config: 'MineMeldConfig') -> None:
         """Initalizes graph by sending startup messages.
 
         Args:
             config (MineMeldConfig): config
         """
-        result = self._send_cmd_and_wait('state_info', timeout=60)
-        LOG.info('state: {}'.format(result['answers']))
-        LOG.info('changes: {!r}'.format(config.changes))
+        result = self._send_cmd_and_wait(
+            'state_info', target="<nodes>", timeout=60)
 
-        state_info = {k.split(':', 2)[-1]: v for k, v in result['answers'].items()}
+        LOG.info(f'state: {result!r}')
+        LOG.info(f'changes: {config.changes!r}')
+
+        state_info = {k.split(':', 2)[-1]: v for k,
+                      v in result.items()}
 
         startup_plan = plan(config, state_info)
         for node, command in startup_plan.items():
@@ -244,7 +257,7 @@ class MgmtbusMaster(object):
 
         self.graph_status = 'INIT'
 
-    def checkpoint_graph(self, max_tries=60):
+    def checkpoint_graph(self, max_tries: int = 60) -> None:
         """Checkpoints the graph.
 
         Args:
@@ -253,27 +266,26 @@ class MgmtbusMaster(object):
         LOG.info('checkpoint_graph called, checking current state')
 
         if self.graph_status != 'INIT':
-            LOG.info('graph status {}, checkpoint_graph ignored'.format(self.graph_status))
+            LOG.info(
+                f'graph status {self.graph_status}, checkpoint_graph ignored')
             return
 
         while True:
-            revt = self._send_cmd('state_info')
-            success = revt.wait(timeout=30)
-            if success is None:
-                LOG.error('timeout in state_info')
+            try:
+                result = self._send_cmd_and_wait(
+                    'state_info', target="<nodes>", timeout=30)
+
+            except MgmtbusCmdTimeout:
                 gevent.sleep(60)
                 continue
 
-            result = revt.get(block=False)
-            if result['errors'] > 0:
-                LOG.critical('errors reported from nodes in ' +
-                             'checkpoint_graph: %s',
-                             result['errors'])
+            except MgmtbusCmdError:
+                LOG.critical('errors reported from nodes in checkpoint_graph')
                 gevent.sleep(60)
                 continue
 
             all_started = True
-            for answer in result['answers'].values():
+            for answer in result.values():
                 if answer.get('state', None) != minemeld.ft.ft_states.STARTED:
                     all_started = False
                     break
@@ -285,23 +297,23 @@ class MgmtbusMaster(object):
             break
 
         chkp = str(uuid.uuid4())
-        LOG.info('Sending checkpoint {} to nodes'.format(chkp))
+        LOG.info(f'Sending checkpoint {chkp} to nodes')
         for nodename in self.ftlist:
             self._send_node_cmd(nodename, 'checkpoint', params={'value': chkp})
 
         ntries = 0
         while ntries < max_tries:
-            revt = self._send_cmd('state_info')
-            success = revt.wait(timeout=60)
-            if success is None:
+            try:
+                result = self._send_cmd_and_wait(
+                    'state_info', target="<nodes>", timeout=60)
+
+            except (MgmtbusCmdError, MgmtbusCmdTimeout):
                 LOG.error("Error retrieving nodes states after checkpoint")
                 gevent.sleep(30)
                 continue
 
-            result = revt.get(block=False)
-
             cgraphok = True
-            for answer in result['answers'].values():
+            for answer in result.values():
                 cgraphok &= (answer['checkpoint'] == chkp)
             if cgraphok:
                 LOG.info('checkpoint graph - all good')
@@ -368,7 +380,7 @@ class MgmtbusMaster(object):
 
             cc.putval('minemeld.'+gs, v, type_=type_, interval=interval)
 
-    def _merge_status(self, nodename, status):
+    def _merge_status(self, nodename: str, status: Dict[str, Any]) -> None:
         currstatus = self._status.get(nodename, None)
         if currstatus is not None:
             if currstatus.get('clock', -1) > status.get('clock', -2):
@@ -394,7 +406,7 @@ class MgmtbusMaster(object):
         except:
             LOG.exception('Error publishing status')
 
-    def _status_loop(self):
+    def _status_loop(self) -> None:
         """Greenlet that periodically retrieves metrics from nodes and sends
         them to collected.
         """
@@ -407,29 +419,35 @@ class MgmtbusMaster(object):
             loop_interval = 60
 
         while True:
-            revt = self._send_cmd('status')
-            success = revt.wait(timeout=30)
-            if success is None:
+            try:
+                result = self._send_cmd_and_wait(
+                    'status', target="<nodes>", timeout=30)
+
+            except MgmtbusCmdTimeout:
                 LOG.error('timeout in waiting for status updates from nodes')
-            else:
-                result = revt.get(block=False)
+                gevent.sleep(loop_interval)
+                continue
 
-                with self._status_lock:
-                    for nodename, nodestatus in result['answers'].items():
-                        self._merge_status(nodename, nodestatus)
+            except MgmtbusCmdError:
+                gevent.sleep(loop_interval)
+                continue
 
-                try:
-                    self._send_collectd_metrics(
-                        result['answers'],
-                        loop_interval
-                    )
+            with self._status_lock:
+                for nodename, nodestatus in result.items():
+                    self._merge_status(nodename, nodestatus)
 
-                except:
-                    LOG.exception('Exception in _status_loop')
+            try:
+                self._send_collectd_metrics(
+                    result,
+                    loop_interval
+                )
+
+            except Exception:
+                LOG.exception('Exception in _status_loop')
 
             gevent.sleep(loop_interval)
 
-    def status(self, timestamp, **kwargs):
+    def status(self, timestamp: int, **kwargs) -> None:
         source = kwargs.get('source', None)
         if source is None:
             LOG.error('no source in status report - dropped')
@@ -447,9 +465,10 @@ class MgmtbusMaster(object):
             if timestamp < self._start_timestamp:
                 return
 
+            # XXX - this prefix should be removed at some point
             self._merge_status('mbus:slave:'+source, status)
 
-    def start_status_monitor(self):
+    def start_status_monitor(self) -> None:
         """Starts status monitor greenlet.
         """
         if self.status_glet is not None:
@@ -458,7 +477,7 @@ class MgmtbusMaster(object):
 
         self.status_glet = gevent.spawn(self._status_loop)
 
-    def stop_status_monitor(self):
+    def stop_status_monitor(self) -> None:
         """Stops status monitor greenlet.
         """
         if self.status_glet is None:
@@ -466,10 +485,10 @@ class MgmtbusMaster(object):
         self.status_glet.kill()
         self.status_glet = None
 
-    def start(self):
+    def start(self) -> None:
         self.comm.start()
 
-    def stop(self):
+    def stop(self) -> None:
         self.comm.stop()
 
 
@@ -493,12 +512,12 @@ class MgmtbusSlaveHub(object):
 
     def request_log_channel(self) -> 'ZMQPubChannel':
         LOG.debug("Adding log channel")
-        return self.comm.request_pub_channel( # type: ignore # XXX - cast does not work on "strings"
+        return self.comm.request_pub_channel(  # type: ignore # XXX - cast does not work on "strings"
             topic=MGMTBUS_LOG_TOPIC,
             multi_write=True
         )
 
-    def send_status(self, params: Dict[str, Union[str,int,bool]]) -> None:
+    def send_status(self, params: Dict[str, Union[str, int, bool]]) -> None:
         self.comm.send_rpc(
             dest=MGMTBUS_STATUS_TOPIC,
             method='status',
@@ -511,17 +530,7 @@ class MgmtbusSlaveHub(object):
             '{}chassis:{}'.format(MGMTBUS_PREFIX, chassis.chassis_id),
             chassis,
             allowed_methods=[
-                'mgmtbus_start'
-            ],
-            method_prefix='mgmtbus_',
-            fanout=MGMTBUS_CHASSIS_TOPIC
-        )
-
-    def request_channel(self, node: 'BaseFT') -> None:
-        self.comm.request_rpc_server_channel(
-            '{}directslave:{}'.format(MGMTBUS_PREFIX, node.name),
-            node,
-            allowed_methods=[
+                'mgmtbus_start',
                 'mgmtbus_state_info',
                 'mgmtbus_initialize',
                 'mgmtbus_rebuild',
@@ -531,27 +540,46 @@ class MgmtbusSlaveHub(object):
                 'mgmtbus_hup',
                 'mgmtbus_signal'
             ],
-            method_prefix='mgmtbus_'
-        )
-        self.comm.request_rpc_server_channel(
-            '{}slave:{}'.format(MGMTBUS_PREFIX, node.name),
-            node,
-            allowed_methods=[
-                'mgmtbus_state_info',
-                'mgmtbus_initialize',
-                'mgmtbus_rebuild',
-                'mgmtbus_reset',
-                'mgmtbus_status',
-                'mgmtbus_checkpoint'
-            ],
             method_prefix='mgmtbus_',
-            fanout=MGMTBUS_TOPIC
+            fanout=MGMTBUS_CHASSIS_TOPIC
         )
+
+    def request_channel(self, node: 'BaseFT') -> None:
+        pass
+        # self.comm.request_rpc_server_channel(
+        #     '{}directslave:{}'.format(MGMTBUS_PREFIX, node.name),
+        #     node,
+        #     allowed_methods=[
+        #         'mgmtbus_state_info',
+        #         'mgmtbus_initialize',
+        #         'mgmtbus_rebuild',
+        #         'mgmtbus_reset',
+        #         'mgmtbus_status',
+        #         'mgmtbus_checkpoint',
+        #         'mgmtbus_hup',
+        #         'mgmtbus_signal'
+        #     ],
+        #     method_prefix='mgmtbus_'
+        # )
+        # self.comm.request_rpc_server_channel(
+        #     '{}slave:{}'.format(MGMTBUS_PREFIX, node.name),
+        #     node,
+        #     allowed_methods=[
+        #         'mgmtbus_state_info',
+        #         'mgmtbus_initialize',
+        #         'mgmtbus_rebuild',
+        #         'mgmtbus_reset',
+        #         'mgmtbus_status',
+        #         'mgmtbus_checkpoint'
+        #     ],
+        #     method_prefix='mgmtbus_',
+        #     fanout=MGMTBUS_TOPIC
+        # )
 
     def add_failure_listener(self, f: Callable[[], None]) -> None:
         self.comm.add_failure_listener(f)
 
-    def send_master_rpc(self, command: str, params: Optional[Dict[str,Union[int,bool,str]]]=None, timeout: Optional[int]=None) -> Optional[Any]:
+    def send_master_rpc(self, command: str, params: Optional[Dict[str, Union[int, bool, str]]] = None, timeout: Optional[int] = None) -> Optional[Any]:
         return self.comm.send_rpc(
             MGMTBUS_MASTER,
             command,

@@ -2,9 +2,9 @@ pip>=9.0.1
 amqp
 gevent
 greenlet
-hiredis==0.2.0
+hiredis
 PyYAML
-redis==2.10.5
+redis
 requests
 plyvel
 netaddr==0.7.18

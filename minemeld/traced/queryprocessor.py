@@ -63,7 +63,7 @@ class Query(gevent.Greenlet):
         query = query.strip()
         components = query.lower().split()
 
-        field_specific = re.compile('^[\w$]+:.*$')
+        field_specific = re.compile(r'^[\w$]+:.*$')
 
         self.parsed_query = []
         for c in components:
@@ -115,7 +115,8 @@ class Query(gevent.Greenlet):
         LOG.debug("Query %s started", self.uuid)
 
         SR = redis.StrictRedis.from_url(
-            self.redis_url
+            self.redis_url,
+            encoding="utf-8", decode_responses=True
         )
 
         line_generator = self.store.iterate_backwards(

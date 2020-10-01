@@ -13,7 +13,6 @@
 #  limitations under the License.
 
 
-
 import logging
 import copy
 import urllib.parse
@@ -113,11 +112,16 @@ class TaxiiClient(basepoller.BasePollerFT):
         )
 
         # options for processing
-        self.ip_version_auto_detect = self.config.get('ip_version_auto_detect', True)
-        self.ignore_composition_operator = self.config.get('ignore_composition_operator', False)
-        self.create_fake_indicator = self.config.get('create_fake_indicator', False)
-        self.hash_priority = self.config.get('hash_priority', _STIX_MINEMELD_HASHES)
-        self.lower_timestamp_precision = self.config.get('lower_timestamp_precision', False)
+        self.ip_version_auto_detect = self.config.get(
+            'ip_version_auto_detect', True)
+        self.ignore_composition_operator = self.config.get(
+            'ignore_composition_operator', False)
+        self.create_fake_indicator = self.config.get(
+            'create_fake_indicator', False)
+        self.hash_priority = self.config.get(
+            'hash_priority', _STIX_MINEMELD_HASHES)
+        self.lower_timestamp_precision = self.config.get(
+            'lower_timestamp_precision', False)
 
         self.discovery_service = self.config.get('discovery_service', None)
         self.collection = self.config.get('collection', None)
@@ -133,7 +137,8 @@ class TaxiiClient(basepoller.BasePollerFT):
             self.client_credentials_required = False
 
         # option for enabling client cert, default disabled
-        self.client_cert_required = self.config.get('client_cert_required', False)
+        self.client_cert_required = self.config.get(
+            'client_cert_required', False)
         self.key_file = self.config.get('key_file', None)
         if self.key_file is None and self.client_cert_required:
             self.key_file = os.path.join(
@@ -148,7 +153,8 @@ class TaxiiClient(basepoller.BasePollerFT):
             )
 
         self.subscription_id = None
-        self.subscription_id_required = self.config.get('subscription_id_required', False)
+        self.subscription_id_required = self.config.get(
+            'subscription_id_required', False)
 
         self.ca_file = self.config.get('ca_file', None)
         if self.ca_file is None:
@@ -193,13 +199,15 @@ class TaxiiClient(basepoller.BasePollerFT):
             if username is not None and password is not None:
                 self.username = username
                 self.password = password
-                LOG.info('{} - Loaded credentials from side config'.format(self.name))
+                LOG.info(
+                    '{} - Loaded credentials from side config'.format(self.name))
 
         if self.subscription_id_required:
             subscription_id = sconfig.get('subscription_id', None)
             if subscription_id is not None:
                 self.subscription_id = subscription_id
-                LOG.info('{} - Loaded subscription id from side config'.format(self.name))
+                LOG.info(
+                    '{} - Loaded subscription id from side config'.format(self.name))
 
     def _saved_state_restore(self, saved_state):
         super(TaxiiClient, self)._saved_state_restore(saved_state)
@@ -318,7 +326,8 @@ class TaxiiClient(basepoller.BasePollerFT):
         request = libtaxii.messages_11.CollectionInformationRequest(msg_id)
         request = request.to_xml()
 
-        resp = self._call_taxii_service(self.collection_mgmt_service, tc, request)
+        resp = self._call_taxii_service(
+            self.collection_mgmt_service, tc, request)
 
         tm = libtaxii.get_message_from_http_response(resp, msg_id)
 
@@ -470,7 +479,8 @@ class TaxiiClient(basepoller.BasePollerFT):
         }
 
         if len(stix_objects['indicators']) == 0 and len(stix_objects['observables']) != 0:
-            LOG.info('{} - TAXII Content contains observables but no indicators'.format(self.name))
+            LOG.info(
+                '{} - TAXII Content contains observables but no indicators'.format(self.name))
             if self.create_fake_indicator:
                 stix_objects['indicators']['minemeld:00000000-0000-0000-0000-000000000000'] = {
                     'observables': list(stix_objects['observables'].values()),
@@ -575,7 +585,8 @@ class TaxiiClient(basepoller.BasePollerFT):
                 if isinstance(timestamp, datetime):
                     timestamp = dt_to_millisec(timestamp)
                     if self.last_stix_package_ts is None or timestamp > self.last_stix_package_ts:
-                        LOG.debug('{} - last STIX package timestamp set to {!r}'.format(self.name, timestamp))
+                        LOG.debug(
+                            '{} - last STIX package timestamp set to {!r}'.format(self.name, timestamp))
                         self.last_stix_package_ts = timestamp
 
         except:
@@ -752,7 +763,8 @@ class TaxiiClient(basepoller.BasePollerFT):
                 elif addrcat == 'e-mail':
                     result['type'] = 'email-addr'
                 else:
-                    LOG.error('{} - unknown address category: {}'.format(self.name, addrcat))
+                    LOG.error(
+                        '{} - unknown address category: {}'.format(self.name, addrcat))
                     return None
 
             else:
@@ -767,7 +779,8 @@ class TaxiiClient(basepoller.BasePollerFT):
                 try:
                     parsed = netaddr.IPNetwork(address)
                 except (netaddr.AddrFormatError, ValueError):
-                    LOG.error('{} - Unknown IP version: {}'.format(self.name, address))
+                    LOG.error(
+                        '{} - Unknown IP version: {}'.format(self.name, address))
                     return None
 
                 if parsed.version == 4:
@@ -801,7 +814,8 @@ class TaxiiClient(basepoller.BasePollerFT):
 
         elif ot == 'LinkObjectType':
             if op.get('type', 'URL') != 'URL':
-                LOG.error('{} - Unhandled LinkObjectType type: {!r}'.format(self.name, op))
+                LOG.error(
+                    '{} - Unhandled LinkObjectType type: {!r}'.format(self.name, op))
                 return None
 
             result['type'] = 'URL'
@@ -902,7 +916,8 @@ class TaxiiClient(basepoller.BasePollerFT):
                         if isinstance(i['simple_hash_value'], string_types):
                             result[hash_type] = i['simple_hash_value']
                         else:
-                            result[hash_type] = i['simple_hash_value'].get('value', None)
+                            result[hash_type] = i['simple_hash_value'].get(
+                                'value', None)
 
         elif ot == 'WhoisObjectType':
             ov = ''
@@ -926,14 +941,17 @@ class TaxiiClient(basepoller.BasePollerFT):
                     LOG.debug('HTTPSessionObjectType item: {!r}'.format(item))
                     http_client_request = item.get('http_client_request', None)
                     if http_client_request is not None:
-                        http_request_header = http_client_request.get('http_request_header', None)
+                        http_request_header = http_client_request.get(
+                            'http_request_header', None)
                         if http_request_header is not None:
-                            raw_header = http_request_header.get('raw_header', None)
+                            raw_header = http_request_header.get(
+                                'raw_header', None)
                             if raw_header is not None:
                                 result['header'] = raw_header
                                 ov = raw_header.split('\n')[0]
                 else:
-                    LOG.error('{} - multiple HTTPSessionObjectTypes not supported'.format(self.name))
+                    LOG.error(
+                        '{} - multiple HTTPSessionObjectTypes not supported'.format(self.name))
 
         elif ot == 'PortObjectType':
             result['type'] = 'port'
@@ -971,34 +989,39 @@ class TaxiiClient(basepoller.BasePollerFT):
                         if isinstance(i['simple_hash_value'], string_types):
                             result[hash_type] = i['simple_hash_value']
                         else:
-                            result[hash_type] = i['simple_hash_value'].get('value', None)
+                            result[hash_type] = i['simple_hash_value'].get(
+                                'value', None)
 
         elif ot == 'CISCP:IndicatorTypeVocab-0.0':
             result['type'] = op['xsi:type']
             LOG.debug('CISCP:IndicatorTypeVocab-0.0 OP: {!r}'.format(op))
             ov = None
-            LOG.error('{} - CISCP:IndicatorTypeVocab-0.0 Type not currently supported'.format(self.name))
+            LOG.error(
+                '{} - CISCP:IndicatorTypeVocab-0.0 Type not currently supported'.format(self.name))
             return None
 
         elif ot == 'WindowsRegistryKeyObjectType':
             result['type'] = op['xsi:type']
             LOG.debug('WindowsRegistryKeyObjectType OP: {!r}'.format(op))
             ov = None
-            LOG.error('{} - WindowsRegistryKeyObjectType Type not currently supported'.format(self.name))
+            LOG.error(
+                '{} - WindowsRegistryKeyObjectType Type not currently supported'.format(self.name))
             return None
 
         elif ot == 'stixVocabs:IndicatorTypeVocab-1.0':
             result['type'] = op['xsi:type']
             LOG.debug('stixVocabs:IndicatorTypeVocab-1.0 OP: {!r}'.format(op))
             ov = None
-            LOG.error('{} - stixVocabs:IndicatorTypeVocab-1.0 Type not currently supported'.format(self.name))
+            LOG.error(
+                '{} - stixVocabs:IndicatorTypeVocab-1.0 Type not currently supported'.format(self.name))
             return None
 
         elif ot == 'NetworkConnectionObjectType':
             result['type'] = 'NetworkConnection'
             LOG.debug('NetworkConnectionObjectType OP: {!r}'.format(op))
             ov = None
-            LOG.error('{} - NetworkConnectionObjectType Type not currently supported'.format(self.name))
+            LOG.error(
+                '{} - NetworkConnectionObjectType Type not currently supported'.format(self.name))
             return None
 
         else:
@@ -1037,7 +1060,8 @@ class TaxiiClient(basepoller.BasePollerFT):
         value['%s_indicator' % self.prefix] = iid
 
         if 'description' in iv:
-            value['{}_indicator_description'.format(self.prefix)] = iv['description']
+            value['{}_indicator_description'.format(
+                self.prefix)] = iv['description']
 
         if 'confidence' in iv:
             value['confidence'] = iv['confidence']
@@ -1385,8 +1409,9 @@ class DataFeed(actorbase.ActorBaseFT):
         super(DataFeed, self).configure()
 
         self.redis_url = self.config.get('redis_url',
-            os.environ.get('REDIS_URL', 'unix:///var/run/redis/redis.sock')
-        )
+                                         os.environ.get(
+                                             'REDIS_URL', 'unix:///var/run/redis/redis.sock')
+                                         )
 
         self.namespace = self.config.get('namespace', 'minemeld')
         self.namespaceuri = self.config.get(
@@ -1402,24 +1427,31 @@ class DataFeed(actorbase.ActorBaseFT):
 
         self.max_entries = self.config.get('max_entries', 1000 * 1000)
 
-        self.attributes_package_title = self.config.get('attributes_package_title', [])
+        self.attributes_package_title = self.config.get(
+            'attributes_package_title', [])
         if not isinstance(self.attributes_package_title, list):
             LOG.error('{} - attributes_package_title should be a list - ignored')
             self.attributes_package_title = []
 
-        self.attributes_package_description = self.config.get('attributes_package_description', [])
+        self.attributes_package_description = self.config.get(
+            'attributes_package_description', [])
         if not isinstance(self.attributes_package_description, list):
-            LOG.error('{} - attributes_package_description should be a list - ignored')
+            LOG.error(
+                '{} - attributes_package_description should be a list - ignored')
             self.attributes_package_description = []
 
-        self.attributes_package_sdescription = self.config.get('attributes_package_short_description', [])
+        self.attributes_package_sdescription = self.config.get(
+            'attributes_package_short_description', [])
         if not isinstance(self.attributes_package_sdescription, list):
-            LOG.error('{} - attributes_package_sdescription should be a list - ignored')
+            LOG.error(
+                '{} - attributes_package_sdescription should be a list - ignored')
             self.attributes_package_sdescription = []
 
-        self.attributes_package_information_source = self.config.get('attributes_package_information_source', [])
+        self.attributes_package_information_source = self.config.get(
+            'attributes_package_information_source', [])
         if not isinstance(self.attributes_package_information_source, list):
-            LOG.error('{} - attributes_package_information_source should be a list - ignored')
+            LOG.error(
+                '{} - attributes_package_information_source should be a list - ignored')
             self.attributes_package_information_source = []
 
     def connect(self, inputs, output):
@@ -1443,7 +1475,9 @@ class DataFeed(actorbase.ActorBaseFT):
             return
 
         self.SR = redis.StrictRedis.from_url(
-            self.redis_url
+            self.redis_url,
+            encoding="utf-8",
+            decode_responses=True
         )
 
     def _read_oldest_indicator(self):
@@ -1522,8 +1556,10 @@ class DataFeed(actorbase.ActorBaseFT):
                 break
 
             if information_source is not None:
-                identity = stix.common.identity.Identity(name=information_source)
-                information_source = stix.common.information_source.InformationSource(identity=identity)
+                identity = stix.common.identity.Identity(
+                    name=information_source)
+                information_source = stix.common.information_source.InformationSource(
+                    identity=identity)
 
         handling = None
         share_level = value.get('share_level', None)
@@ -1543,7 +1579,7 @@ class DataFeed(actorbase.ActorBaseFT):
             description is not None or
             handling is not None or
             sdescription is not None or
-            information_source is not None):
+                information_source is not None):
             header = stix.core.STIXHeader(
                 title=title,
                 description=description,
@@ -1567,7 +1603,8 @@ class DataFeed(actorbase.ActorBaseFT):
             )
 
             if value['type'] == 'URL':
-                eindicator = werkzeug.urls.iri_to_uri(indicator, safe_conversion=True)
+                eindicator = werkzeug.urls.iri_to_uri(
+                    indicator, safe_conversion=True)
             else:
                 eindicator = indicator
 
@@ -1694,13 +1731,16 @@ class DataFeed(actorbase.ActorBaseFT):
         redis_skey_value = '{}.value'.format(name)
         redis_skey_chkp = '{}.chkp'.format(name)
         redis_url = config.get('redis_url',
-            os.environ.get('REDIS_URL', 'unix:///var/run/redis/redis.sock')
-        )
+                               os.environ.get(
+                                   'REDIS_URL', 'unix:///var/run/redis/redis.sock')
+                               )
 
         cp = None
         try:
             cp = redis.ConnectionPool.from_url(
-                redis_url
+                redis_url,
+                encoding="utf-8",
+                decode_responses=True
             )
 
             SR = redis.StrictRedis(connection_pool=cp)

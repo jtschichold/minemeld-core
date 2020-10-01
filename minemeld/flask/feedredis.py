@@ -38,18 +38,20 @@ from .redisclient import SR
 __all__ = ['BLUEPRINT']
 
 FEED_INTERVAL = 100
-_PROTOCOL_RE = re.compile('^(?:[a-z]+:)*//')
-_PORT_RE = re.compile('^([a-z0-9\-\.]+)(?:\:[0-9]+)*')
-_INVALID_TOKEN_RE = re.compile('(?:[^\./+=\?&]+\*[^\./+=\?&]*)|(?:[^\./+=\?&]*\*[^\./+=\?&]+)')
-_BROAD_PATTERN = re.compile('^(?:\*\.)+[a-zA-Z]+(?::[0-9]+)?$')
-_IPV4_MASK_RE = re.compile('^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(\\/[0-9]+)?$')
+_PROTOCOL_RE = re.compile(r'^(?:[a-z]+:)*//')
+_PORT_RE = re.compile(r'^([a-z0-9\-\.]+)(?:\:[0-9]+)*')
+_INVALID_TOKEN_RE = re.compile(
+    r'(?:[^\./+=\?&]+\*[^\./+=\?&]*)|(?:[^\./+=\?&]*\*[^\./+=\?&]+)')
+_BROAD_PATTERN = re.compile(r'^(?:\*\.)+[a-zA-Z]+(?::[0-9]+)?$')
+_IPV4_MASK_RE = re.compile(
+    r'^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(\\/[0-9]+)?$')
 _IPV4_RANGE_RE = re.compile(
-    '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}-[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$')
+    r'^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}-[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$')
 
 BLUEPRINT = MMBlueprint('feeds', __name__, url_prefix='/feeds')
 
 
-def _translate_ip_ranges(indicator: str, value: Optional[dict]=None) -> List[str]:
+def _translate_ip_ranges(indicator: str, value: Optional[dict] = None) -> List[str]:
     if value is not None and value['type'] != 'IPv4':
         return [indicator]
 
@@ -64,7 +66,7 @@ def _translate_ip_ranges(indicator: str, value: Optional[dict]=None) -> List[str
 
 @contextmanager
 def _buffer():
-    result = io.StringIO()
+    result = io.BytesIO()
 
     try:
         yield result
@@ -83,18 +85,16 @@ def generate_panosurl_feed(feed: str, start: int, num: int, desc: bool, value: s
     cstart = start
 
     while cstart < (start + num):
-        ilist: List[bytes] = zrange(
+        ilist: List[str] = zrange(
             feed, cstart,
             cstart - 1 + min(start + num - cstart, FEED_INTERVAL)
         )
 
-        for bi in ilist:
-            i = bi.decode('utf-8').lower()
-
+        for i in ilist:
             i = _PROTOCOL_RE.sub('', i)
 
             withport = i
-            i = _PORT_RE.sub('\g<1>', i)
+            i = _PORT_RE.sub(r'\g<1>', i)
             LOG.debug('{} => {}'.format(withport, i))
             if withport != i and 'sp' not in kwargs:
                 # port removed, but strip port not enabled
@@ -108,7 +108,7 @@ def generate_panosurl_feed(feed: str, start: int, num: int, desc: bool, value: s
                 if 'di' in kwargs:
                     # drop invalid in params, drop entry
                     continue
-                
+
                 # check if the pattern is now too broad
                 hostname = i
                 if '/' in hostname:
@@ -143,16 +143,15 @@ def generate_plain_feed(feed: str, start: int, num: int, desc: bool, value: str,
     cstart = start
 
     while cstart < (start + num):
-        ilist: List[bytes] = zrange(
+        ilist: List[str] = zrange(
             feed, cstart,
             cstart - 1 + min(start + num - cstart, FEED_INTERVAL)
         )
-        str_ilist: List[str] = [i.decode('utf-8') for i in ilist]
 
         if translate_ip_ranges:
-            str_ilist = [xi for i in str_ilist for xi in _translate_ip_ranges(i)]
+            ilist = [xi for i in ilist for xi in _translate_ip_ranges(i)]
 
-        yield '\n'.join(str_ilist) + '\n'
+        yield '\n'.join(ilist) + '\n'
 
         if len(ilist) < 100:
             break
@@ -160,7 +159,7 @@ def generate_plain_feed(feed: str, start: int, num: int, desc: bool, value: str,
         cstart += 100
 
 
-def generate_json_feed(feed, start, num, desc, value, **kwargs):
+def generate_json_feed(feed: str, start: int, num: int, desc: bool, value: str, **kwargs) -> Iterator[str]:
     zrange = SR.zrange
     if desc:
         zrange = SR.zrevrange
@@ -187,7 +186,8 @@ def generate_json_feed(feed, start, num, desc, value, **kwargs):
 
             xindicators = [indicator]
             if translate_ip_ranges and '-' in indicator:
-                xindicators = _translate_ip_ranges(indicator, None if v is None else json.loads(v))
+                xindicators = _translate_ip_ranges(
+                    indicator, None if v is None else json.loads(v))
 
             if v is None:
                 v = 'null'
@@ -223,7 +223,7 @@ def generate_json_feed(feed, start, num, desc, value, **kwargs):
         yield ']\n'
 
 
-def generate_csv_feed(feed, start, num, desc, value, **kwargs):
+def generate_csv_feed(feed: str, start: int, num: int, desc: bool, value: str, **kwargs) -> Iterator[str]:
     def _is_atomic_type(fv):
         return (isinstance(fv, str) or isinstance(fv, int) or isinstance(fv, bool))
 
@@ -261,6 +261,7 @@ def generate_csv_feed(feed, start, num, desc, value, **kwargs):
             cname = addf
         columns.append(cname)
         fields.append(fname)
+    LOG.info(f"CSV columns: {columns!r}")
 
     # if no fields are specified, only indicator is generated
     if len(fields) == 0:
@@ -435,8 +436,8 @@ def generate_carbon_black(feed: str, start: int, num: int, desc: bool, value: st
     mm_to_cb = {"IPv4": "ipv4",
                 "domain": "dns",
                 "md5": "md5"}
-    ind_by_type: Dict[str,list] = {"dns": [],
-                   "md5": []}
+    ind_by_type: Dict[str, list] = {"dns": [],
+                                    "md5": []}
 
     # Let's stream the information as soon as we have it
     yield "{\n\"feedinfo\": {\n"
@@ -502,7 +503,7 @@ def generate_carbon_black(feed: str, start: int, num: int, desc: bool, value: st
     yield "}}]}"
 
 
-_FEED_FORMATS: Dict[str,Dict] = {
+_FEED_FORMATS: Dict[str, Dict] = {
     'json': {
         'formatter': generate_json_feed,
         'mimetype': 'application/json'
@@ -535,7 +536,7 @@ _FEED_FORMATS: Dict[str,Dict] = {
 
 
 @BLUEPRINT.route('/<feed>', methods=['GET'], feeds=True, read_write=False)
-def get_feed_content(feed: str) -> Union[Tuple[str,int],Response]:
+def get_feed_content(feed: str) -> Union[Tuple[str, int], Response]:
     if not current_user.check_feed(feed):
         return '<html><body>Unauthorized</body></html>', 401
 
@@ -543,7 +544,8 @@ def get_feed_content(feed: str) -> Union[Tuple[str,int],Response]:
     status = MMMaster.status()
     tr = status.get('result', None)
     if tr is None:
-        LOG.error("Error retrieving status from MMMaster: {!r}".format(status.get('error', 'error')))
+        LOG.error("Error retrieving status from MMMaster: {!r}".format(
+            status.get('error', 'error')))
         return '<html><body>Internal error</body></html>', 500
 
     nname = 'mbus:slave:' + feed
@@ -584,7 +586,8 @@ def get_feed_content(feed: str) -> Union[Tuple[str,int],Response]:
         return '<html><body>unknown format</body></html>', 400
 
     kwargs = {}
-    kwargs['translate_ip_ranges'] = int(request.values.get('tr', 0))  # generate IP ranges
+    kwargs['translate_ip_ranges'] = int(
+        request.values.get('tr', 0))  # generate IP ranges
 
     # move to kwargs all the additional parameters, pop the predefined
     kwargs.update(request.values.to_dict(flat=False))

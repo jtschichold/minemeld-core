@@ -2,7 +2,9 @@
 
 import logging
 import time
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
+import urllib.parse
+import urllib.error
 import os
 import sys
 import re
@@ -92,7 +94,7 @@ def delete_config(mmurl, username, password):
     for idx, n in enumerate(full_config['nodes']):
         if not n:
             continue
-        
+
         delete_node(
             idx,
             n['version'],
@@ -216,16 +218,17 @@ def wait_for_restart(mmurl, username, password):
     else:
         raise RuntimeError('engine did not restart in 5 minutes')
 
+
 def push_indicators(mmurl, username, password):
     LOG.info('Pushing indicators...')
 
-    with open('IPv4.lst', 'r') as f:
+    with open('IPv4.lst', 'r', encoding="utf-8") as f:
         ipv4_iocs = f.readlines()
 
-    with open('URL.lst', 'r') as f:
+    with open('URL.lst', 'r', encoding="utf-8") as f:
         url_iocs = f.readlines()
 
-    with open('domain.lst', 'r') as f:
+    with open('domain.lst', 'r', encoding="utf-8") as f:
         domain_iocs = f.readlines()
 
     num_ipv4_iocs = len(ipv4_iocs)
@@ -262,7 +265,7 @@ def push_indicators(mmurl, username, password):
 
         if len(response.content.splitlines()) == num_url_iocs:
             break
-    
+
         time.sleep(10)
 
     else:
@@ -280,7 +283,7 @@ def push_indicators(mmurl, username, password):
 
         if len(response.content.splitlines()) == num_ipv4_iocs:
             break
-    
+
         time.sleep(10)
 
     else:
@@ -300,7 +303,7 @@ def push_indicators(mmurl, username, password):
             break
 
         time.sleep(10)
-    
+
     else:
         raise RuntimeError('domain IOCs did not propagate in 5 minutes')
 
@@ -324,7 +327,7 @@ def check_feeds(mmurl):
 
         req, _ = fname.split('.', 1)
 
-        with open(fname, 'r') as f:
+        with open(fname, 'r', encoding="utf-8") as f:
             result = f.readlines()
 
         LOG.info('Checking {}...'.format(urllib.parse.unquote(req)))
@@ -334,21 +337,23 @@ def check_feeds(mmurl):
         )
         response.raise_for_status()
 
-        clines = response.content.splitlines()
+        clines = response.text.splitlines()
 
         for idx, (cl, rl) in enumerate(zip_longest(result, clines)):
             cl = remove_timestamps(cl.strip())
             rl = remove_timestamps(rl.strip())
 
             if cl != rl:
-                LOG.error('{} does not match'.format(urllib.parse.unquote(req)))
+                LOG.error('{} does not match'.format(
+                    urllib.parse.unquote(req)))
                 LOG.error('L{}    expected: {!r}'.format(idx, rl))
                 LOG.error('L{}    result:   {!r}'.format(idx, cl))
-                
+
                 check_result = False
                 break
 
     return check_result
+
 
 def main():
     logging.basicConfig(level=logging.INFO)

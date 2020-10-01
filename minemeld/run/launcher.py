@@ -13,33 +13,36 @@
 #  limitations under the License.
 
 
-
+from minemeld import __version__
+import minemeld.run.config
+import minemeld.comm
+import minemeld.mgmtbus
+import minemeld.chassis
+import psutil
+from typing import (
+    Type, List, TYPE_CHECKING,
+    Dict, Optional,
+)
+import math
+import os
+import argparse
+import multiprocessing
+import signal
+import logging
+import os.path
 import gevent
 import gevent.signal
 import gevent.monkey
 gevent.monkey.patch_all(thread=False, select=False)
 
-import os.path
-import logging
-import signal
-import multiprocessing
-import argparse
-import os
-import math
-
-import psutil
-
-import minemeld.chassis
-import minemeld.mgmtbus
-import minemeld.comm
-import minemeld.run.config
-
-from minemeld import __version__
 
 LOG = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from minemeld.run.config import TMineMeldNodeConfig
 
-def _run_chassis(fabricconfig, mgmtbusconfig, fts):
+
+def _run_chassis(fabricconfig: dict, mgmtbusconfig: dict, fts: Dict[str, 'TMineMeldNodeConfig']):
     try:
         # lower priority to make master and web
         # more "responsive"
@@ -75,7 +78,7 @@ def _run_chassis(fabricconfig, mgmtbusconfig, fts):
         raise
 
 
-def _check_disk_space(num_nodes):
+def _check_disk_space(num_nodes: int) -> Optional[int]:
     free_disk_per_node = int(os.environ.get(
         'MM_DISK_SPACE_PER_NODE',
         10*1024  # default: 10MB per node
@@ -89,7 +92,7 @@ def _check_disk_space(num_nodes):
         LOG.critical(
             ('Not enough space left on the device, available: {} needed: {}'
              ' - please delete traces, logs and old engine versions and restart').format(
-             free_disk, needed_disk
+                free_disk, needed_disk
             )
         )
         return None
@@ -137,7 +140,7 @@ def _parse_args():
     return parser.parse_args()
 
 
-def _setup_environment(config):
+def _setup_environment(config: str) -> None:
     # make config dir available to nodes
     cdir = config
     if not os.path.isdir(cdir):
@@ -148,7 +151,7 @@ def _setup_environment(config):
         os.environ['REQUESTS_CA_BUNDLE'] = os.environ['MM_CA_BUNDLE']
 
 
-def main():
+def main() -> int:
     mbusmaster = None
     processes_lock = None
     processes = None
@@ -181,15 +184,15 @@ def main():
 
         signal_received.set()
 
-    def _sigint_handler(signum, sigstack):
+    def _sigint_handler(signum, sigstack) -> None:
         LOG.info('SIGINT received')
         gevent.spawn(_cleanup)
 
-    def _sigterm_handler(signum, sigstack):
+    def _sigterm_handler(signum, sigstack) -> None:
         LOG.info('SIGTERM received')
         gevent.spawn(_cleanup)
 
-    def _disk_space_monitor(num_nodes):
+    def _disk_space_monitor(num_nodes: int) -> None:
         while True:
             if _check_disk_space(num_nodes=num_nodes) is None:
                 gevent.spawn(_cleanup)
@@ -241,7 +244,7 @@ def main():
     )
     LOG.info("Number of chassis: %d", np)
 
-    ftlists = [{} for j in range(np)]
+    ftlists: List[Dict[str, 'TMineMeldNodeConfig']] = [{} for j in range(np)]
     j = 0
     for ft in config.nodes:
         pn = j % len(ftlists)
@@ -301,7 +304,8 @@ def main():
         _cleanup()
         raise
 
-    disk_space_monitor_glet = gevent.spawn(_disk_space_monitor, len(config.nodes))
+    disk_space_monitor_glet = gevent.spawn(
+        _disk_space_monitor, len(config.nodes))
 
     try:
         while not signal_received.wait(timeout=1.0):
@@ -314,8 +318,10 @@ def main():
     except KeyboardInterrupt:
         LOG.info("Ctrl-C received, exiting")
 
-    except:
+    except Exception:
         LOG.exception("Exception in main loop")
 
     if disk_space_monitor_glet is not None:
         disk_space_monitor_glet.kill()
+
+    return 0

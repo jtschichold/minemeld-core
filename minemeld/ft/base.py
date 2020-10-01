@@ -673,6 +673,8 @@ class BaseFT(object):
             status=status
         )
 
+    # mgmtbus_* methods are called by Chassis
+    # when receiving RPC calls
     def mgmtbus_state_info(self) -> dict:
         return {
             'checkpoint': self.last_checkpoint,
@@ -722,6 +724,7 @@ class BaseFT(object):
 
     def mgmtbus_checkpoint(self, value: Optional[str]=None) -> str:
         if len(self.inputs) != 0:
+            # checkpoint on non root nodes is ignored
             return 'ignored'
 
         if value is None:
@@ -737,13 +740,16 @@ class BaseFT(object):
     def mgmtbus_hup(self, source: Optional[str]=None) -> None:
         self.hup(source=source)
 
-    def mgmtbus_signal(self, source: Optional[str]=None, signal: Optional[str]=None, **kwargs):
+    def mgmtbus_signal(self, source: Optional[str]=None, signal: Optional[str]=None, **kwargs) -> Any:
         if signal == 'trace':
             self.enable_full_trace()
             return self._disable_full_trace
 
         raise NotImplementedError('{}: signal - not implemented'.format(self.name))
 
+    # the following 3 methods are called during
+    # initalization. They should be overridden by subclasses and return as fast
+    # as possible
     def initialize(self) -> None:
         pass
 
@@ -752,21 +758,6 @@ class BaseFT(object):
 
     def reset(self) -> None:
         pass
-
-    def get_state(self) -> int:
-        return self.state
-
-    def get(self, source=None, indicator=None):
-        raise NotImplementedError('%s: get - not implemented' % self.name)
-
-    def get_all(self, source=None):
-        raise NotImplementedError('%s: get_all - not implemented' % self.name)
-
-    def get_range(self, source: Optional[str]=None, index: Optional[str]=None,
-                from_key: Union[None, str, int]=None,
-                to_key: Union[None, str, int]=None) -> None:
-        raise NotImplementedError('%s: get_range - not implemented' %
-                                  self.name)
 
     def length(self, source: Optional[str]=None) -> int:
         raise NotImplementedError('%s: length - not implemented' % self.name)

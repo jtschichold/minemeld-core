@@ -118,7 +118,7 @@ def teardown(exception):
 
 def init_app(app, redis_url):
     """Initalize event generator in the app
-    
+
     Args:
         app (object): Flask App
         redis_url (str): Redis URL for communicating with engine
@@ -128,7 +128,9 @@ def init_app(app, redis_url):
 
     redis_cp = redis.ConnectionPool.from_url(
         redis_url,
-        max_connections=1
+        max_connections=1,
+        encoding="utf-8",
+        decode_responses=True
     )
     STATUS_EVENTS_SUBSCRIBER = StatusEventsSubscriber(connection_pool=redis_cp)
     STATUS_EVENTS_SUBSCRIBER.start()

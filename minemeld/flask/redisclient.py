@@ -14,7 +14,9 @@ __all__ = ['init_app', 'SR']
 
 REDIS_CP = redis.ConnectionPool.from_url(
     REDIS_URL,
-    max_connections=int(os.environ.get('REDIS_MAX_CONNECTIONS', 200))
+    max_connections=int(os.environ.get('REDIS_MAX_CONNECTIONS', 200)),
+    decode_responses=True,
+    encoding="utf-8"
 )
 
 
