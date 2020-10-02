@@ -73,16 +73,16 @@ class RedisPubChannel(object):
         assert self.SR is not None
 
         # get status of subscribers
-        subscribersc = self.SR.lrange(
+        subscribersc: List[bytes] = self.SR.lrange(
             '{}:subscribers'.format(self.prefix),
             0, -1
         )
-        subscribersc = [int(sc) for sc in subscribersc]
+        decoded_subscribersc = [int(sc) for sc in subscribersc]
 
         # check the lagger
         minsubc = self.num_publish
-        if len(subscribersc) != 0:
-            minsubc = min(subscribersc)
+        if len(decoded_subscribersc) != 0:
+            minsubc = min(decoded_subscribersc)
 
         return minsubc
 
@@ -97,9 +97,9 @@ class RedisPubChannel(object):
         )
 
         # delete all the lists before the lagger
-        queues = self.SR.keys('{}:queue:*'.format(self.prefix))
+        queues: List[bytes] = self.SR.keys(f'{self.prefix}:queue:*')
         LOG.debug('topic {} - queues: {!r}'.format(self.topic, queues))
-        queues = [q for q in queues if q < minqname]
+        queues = [q for q in queues if q.decode('utf-8') < minqname]
         LOG.debug(
             'topic {} - queues to be deleted: {!r}'.format(self.topic, queues))
         if len(queues) != 0:
@@ -158,9 +158,9 @@ class ZMQRpcFanoutClientChannel(object):
         self.fanout = fanout
         self.active_rpcs: Dict[str, dict] = {}
 
-    def run(self) -> None:
+    def run(self) -> bool:
         if self.reply_socket is None:
-            return
+            return False
 
         LOG.debug(
             'RPC Fanout reply recving from {}:reply'.format(self.fanout))
@@ -168,7 +168,7 @@ class ZMQRpcFanoutClientChannel(object):
             body = self.reply_socket.recv_json(flags=zmq.NOBLOCK)
 
         except zmq.ZMQError:
-            return
+            return False
 
         LOG.debug('RPC Fanout reply from {}:reply recvd: {!r}'.format(
             self.fanout, body))
@@ -180,18 +180,18 @@ class ZMQRpcFanoutClientChannel(object):
         if source is None:
             LOG.error(
                 'No source in reply in ZMQRpcFanoutClientChannel {}'.format(self.fanout))
-            return
+            return True
 
         id_ = body.get('id', None)
         if id_ is None:
             LOG.error('No id in reply in ZMQRpcFanoutClientChannel {} from {}'.format(
                 self.fanout, source))
-            return
+            return True
         actreq = self.active_rpcs.get(id_, None)
         if actreq is None:
             LOG.error('Unknown id {} in reply in ZMQRpcFanoutClientChannel {} from {}'.format(
                 id_, self.fanout, source))
-            return
+            return True
 
         result = body.get('result', None)
         if result is None:
@@ -210,6 +210,8 @@ class ZMQRpcFanoutClientChannel(object):
                 'errors': actreq['errors']
             })
             self.active_rpcs.pop(id_)
+
+        return True
 
     def send_rpc(self, method: str, params: Optional[Dict[str, Union[str, int, bool]]] = None, num_results: int = 0, and_discard: bool = False) -> gevent.event.AsyncResult:
         if self.socket is None:
@@ -331,12 +333,11 @@ class ZMQRpcServerChannel(object):
                 json.dumps(ans).encode('utf-8')
             ])
 
-    def run(self) -> None:
+    def run(self) -> bool:
         if self.socket is None:
             LOG.error(
                 f'Run called with invalid socket in RPC server channel: {self.name}')
-            gevent.sleep(1)
-            return
+            return False
 
         LOG.debug(f'RPC Server receiving from {self.name} - {self.fanout}')
 
@@ -344,7 +345,7 @@ class ZMQRpcServerChannel(object):
             toks = self.socket.recv_multipart(flags=zmq.NOBLOCK)
 
         except zmq.ZMQError:
-            return
+            return False
 
         LOG.debug(
             'RPC Server recvd from {} - {}: {!r}'.format(self.name, self.fanout, toks))
@@ -364,10 +365,10 @@ class ZMQRpcServerChannel(object):
 
         if method is None:
             LOG.error('No method in msg body')
-            return
+            return True
         if id_ is None:
             LOG.error('No id in msg body')
-            return
+            return True
 
         method = self.method_prefix+method
 
@@ -393,6 +394,8 @@ class ZMQRpcServerChannel(object):
 
         else:
             self._send_result(reply_to, id_, result=result)
+
+        return True
 
     def connect(self, context: zmq.Context) -> None:
         if self.socket is not None:
@@ -494,19 +497,18 @@ class ZMQSubChannel(object):
         self.context: Optional[zmq.Context] = None
         self.socket: Optional[zmq.Socket] = None
 
-    def run(self) -> None:
+    def run(self) -> bool:
         if self.socket is None:
             LOG.error(
                 'Run called with invalid socket in ZMQ Pub channel: {}'.format(self.name))
-            gevent.sleep(1)
-            return
+            return False
 
         LOG.debug('ZMQPub {} receiving'.format(self.name))
         try:
             body = self.socket.recv_json(flags=zmq.NOBLOCK)
 
         except zmq.ZMQError:
-            return
+            return False
 
         LOG.debug('ZMQPub {} recvd: {!r}'.format(self.name, body))
 
@@ -516,23 +518,23 @@ class ZMQSubChannel(object):
 
         if method is None:
             LOG.error('No method in msg body')
-            return
+            return True
         if id_ is None:
             LOG.error('No id in msg body')
-            return
+            return True
 
         method = self.method_prefix+method
 
         if method not in self.allowed_methods:
             LOG.error(
                 f'Method not allowed in RPC server channel {self.name}: {method} {self.allowed_methods}')
-            return
+            return True
 
         m = getattr(self.obj, method, None)
         if m is None:
             LOG.error('Method {} not defined in RPC server channel {}'.format(
                 method, self.name))
-            return
+            return True
 
         try:
             m(**params)
@@ -542,6 +544,8 @@ class ZMQSubChannel(object):
 
         except Exception:
             LOG.exception('Exception in ZMQPub {}'.format(self.name))
+
+        return True
 
     def connect(self, context: zmq.Context) -> None:
         if self.socket is not None:
@@ -612,7 +616,7 @@ class RedisSubChannel(object):
 
         self.num_callbacks += 1
 
-    def run(self, SR: redis.Redis) -> None:
+    def run(self, SR: redis.Redis) -> bool:
         base = self.counter & 0xfff
         top = min(base + 127, 0xfff)
 
@@ -637,6 +641,8 @@ class RedisSubChannel(object):
                 self.sub_number,
                 self.counter
             )
+
+        return len(msgs) > 0
 
     def connect(self) -> None:
         subscribers_key = '{}:subscribers'.format(self.prefix)
@@ -794,64 +800,42 @@ class ZMQRedis(object):
 
         return result
 
-    # def _ioloop(self, executor: Union[ZMQRpcServerChannel, ZMQSubChannel, ZMQRpcFanoutClientChannel]):
-    #     executor.run()
-
-    # def _sub_ioloop(self, schannel: RedisSubChannel) -> None:
-    #     LOG.debug('start draining messages on topic {}'.format(schannel.topic))
-
-    #     counter = 0
-    #     SR = redis.StrictRedis(connection_pool=self.redis_cp)
-    #     subscribers_key = '{}:subscribers'.format(schannel.prefix)
-
-    #     while True:
-    #         base = counter & 0xfff
-    #         top = min(base + 127, 0xfff)
-
-    #         msgs = SR.lrange(
-    #             '{}:queue:{:013X}'.format(schannel.prefix, counter >> 12),
-    #             base,
-    #             top
-    #         )
-
-    #         for m in msgs:
-    #             LOG.debug('topic {} - {!r}'.format(
-    #                 schannel.topic,
-    #                 m
-    #             ))
-    #             schannel._callback(m)
-
-    #         counter += len(msgs)
-
-    #         if len(msgs) > 0:
-    #             SR.lset(
-    #                 subscribers_key,
-    #                 schannel.sub_number,
-    #                 counter
-    #             )
-
-    #         if len(msgs) < (top - base + 1):
-    #             gevent.sleep(1.0)
-    #         else:
-    #             gevent.sleep(0)
-
     def _ioloop(self) -> None:
         SR = redis.StrictRedis(connection_pool=self.redis_cp)
 
+        executors: List[Union[ZMQRpcFanoutClientChannel,RedisSubChannel,ZMQSubChannel]] = []
+        for rfcc in self.rpc_fanout_clients_channels:
+            executors.append(rfcc)
+
+        for mwschannel in self.mw_sub_channels:
+            executors.append(mwschannel)
+
+        for schannel in self.sub_channels:
+            executors.append(schannel)
+
         while True:
+            msg_handled = False
+
             for rpcc in self.rpc_server_channels.values():
-                rpcc.run()
+                while rpcc.run():
+                    msg_handled = True
 
-            for rfcc in self.rpc_fanout_clients_channels:
-                rfcc.run()
+            now = time.time()
+            while (time.time() - now) < 0.1:
+                if len(executors) == 0:
+                    break
 
-            for mwschannel in self.mw_sub_channels:
-                mwschannel.run()
+                executor = executors.pop(0)
+                executors.append(executor)
 
-            for schannel in self.sub_channels:
-                schannel.run(SR)
+                if isinstance(executor, RedisSubChannel):
+                    result = executor.run(SR)
+                else:
+                    result = executor.run()
 
-            gevent.sleep(0.01)
+                msg_handled = msg_handled or result
+
+            gevent.sleep(0 if msg_handled else 0.1)
 
     def _ioloop_failure(self, g: gevent.Greenlet) -> None:
         LOG.error('_ioloop_failure')
@@ -954,7 +938,7 @@ class ZMQRedis(object):
         SR: Optional[redis.Redis] = redis.StrictRedis(connection_pool=redis_cp)
         assert SR is not None
 
-        tkeys = SR.keys(pattern='mm:topic:*')
+        tkeys: List[bytes] = SR.keys(pattern='mm:topic:*')
         if len(tkeys) > 0:
             LOG.info('Deleting old keys: {}'.format(len(tkeys)))
             SR.delete(*tkeys)

@@ -28,6 +28,10 @@ import requests
 import yaml
 import shutil
 from urllib3.response import GzipDecoder
+from typing import (
+    List, Tuple, Iterable,
+    Any, Iterator,
+)
 
 from . import basepoller
 
@@ -73,7 +77,7 @@ class CSVFT(basepoller.BasePollerFT):
         chassis (object): parent chassis instance
         config (dict): node config.
     """
-    def configure(self):
+    def configure(self) -> None:
         super(CSVFT, self).configure()
 
         self.polling_timeout = self.config.get('polling_timeout', 20)
@@ -108,7 +112,7 @@ class CSVFT(basepoller.BasePollerFT):
 
         self._load_side_config()
 
-    def _load_side_config(self):
+    def _load_side_config(self) -> None:
         try:
             with open(self.side_config_path, 'r') as f:
                 sconfig = yaml.safe_load(f)
@@ -127,13 +131,13 @@ class CSVFT(basepoller.BasePollerFT):
             self.password = password
             LOG.info('%s - password set', self.name)
 
-    def _process_item(self, item):
+    def _process_item(self, item: dict) -> List[Tuple[str,dict]]:
         item.pop(None, None)  # I love this
 
         indicator = item.pop('indicator', None)
-        return [[indicator, item]]
+        return [(indicator, item)]
 
-    def _build_request(self, now):
+    def _build_request(self, now: int) -> requests.PreparedRequest:
         auth = None
         if self.username is not None and self.password is not None:
             auth = (self.username, self.password)
@@ -146,7 +150,7 @@ class CSVFT(basepoller.BasePollerFT):
 
         return r.prepare()
 
-    def _build_iterator(self, now):
+    def _build_iterator(self, now: int) -> Iterable[Any]:
         def _debug(x):
             LOG.info('{!r}'.format(x))
             return x
@@ -164,7 +168,7 @@ class CSVFT(basepoller.BasePollerFT):
         rkwargs['verify'] = self.verify_cert
         rkwargs['timeout'] = self.polling_timeout
 
-        r = _session.send(prepreq, **rkwargs)
+        r: requests.Response = _session.send(prepreq, **rkwargs)
 
         try:
             r.raise_for_status()
@@ -191,7 +195,7 @@ class CSVFT(basepoller.BasePollerFT):
 
         return csvreader
 
-    def _gzipped_line_splitter(self, response):
+    def _gzipped_line_splitter(self, response) -> Iterator[str]:
         # same logic used in urllib32.response.iter_lines
         pending = None
 
@@ -201,6 +205,7 @@ class CSVFT(basepoller.BasePollerFT):
             response.iter_content(chunk_size=1024*1024)
         )
 
+        chunk: bytes
         for chunk in chunks:
             if pending is not None:
                 chunk = pending + chunk
@@ -213,10 +218,10 @@ class CSVFT(basepoller.BasePollerFT):
                 pending = None
 
             for line in lines:
-                yield line
+                yield line.decode('utf-8')
 
         if pending is not None:
-            yield pending
+            yield pending.decode('utf-8')
 
     def hup(self, source=None):
         LOG.info('%s - hup received, reload side config', self.name)

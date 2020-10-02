@@ -16,7 +16,7 @@ class ActorBaseFT(BaseFT):
     def __init__(self, *args, **kwargs):
         super(ActorBaseFT, self).__init__(*args, **kwargs)
 
-        self._actor_queue = Queue(maxsize=1)
+        self._actor_queue = Queue(maxsize=0xfff)
         self._actor_glet = None
 
     @_counting('rebuild.queued')
